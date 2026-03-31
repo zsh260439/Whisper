@@ -18,6 +18,7 @@ export default defineConfig({
     'i-carbon-add',
     'i-carbon-settings',
     'i-carbon-moon',
+    'i-carbon-sun',
     'i-carbon-phone',
     'i-carbon-video',
     'i-carbon-search',
@@ -29,6 +30,9 @@ export default defineConfig({
     'i-carbon-microphone',
     'i-carbon-checkmark',
     'i-carbon-chat',
+    'i-carbon-chat-bot',
+    'i-carbon-close-large',
+    'i-carbon-send',
   ],
   theme: {
     colors: {

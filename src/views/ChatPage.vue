@@ -4,8 +4,19 @@
       :conversations="conversations"
       :selected-id="selectedConversationId"
       @select="handleSelectConversation"
+      @add-contact="handleAddContact"
+      @create-group="handleCreateGroup"
+      @join-group="handleJoinGroup"
     />
-    <ChatWindow :conversation="currentConversation" />
+    <ChatWindow
+      :conversation="currentConversation"
+      :current-user-id="CURRENT_USER_ID"
+      :friend-user-ids="friendUserIds"
+      :group-members="groupMembers"
+      :group-invite-candidates="groupInviteCandidates"
+      @add-friend="handleAddFriend"
+      @invite-group-members="handleInviteGroupMembers"
+    />
   </div>
 </template>
 
@@ -23,6 +34,21 @@ export interface Message {
   isMine: boolean
 }
 
+export interface UserProfile {
+  id: number
+  name: string
+  account: string
+  avatar: string
+  avatarColor: string
+  online: boolean
+}
+
+export interface GroupMeta {
+  groupId: string
+  memberIds: number[]
+  memberCount: number
+}
+
 export interface Conversation {
   id: number
   name: string
@@ -34,7 +60,53 @@ export interface Conversation {
   online: boolean
   isGroup: boolean
   messages: Message[]
+  peerUserId?: number
+  groupMeta?: GroupMeta
 }
+
+interface CreateGroupPayload {
+  name: string
+  avatar: string
+  avatarColor: string
+  memberIds: number[]
+}
+
+const CURRENT_USER_ID = 0
+const avatarPalette = ['#91A896', '#8097AA', '#CAA97F', '#D4A39B', '#8AA1B8', '#C89289', '#7E9D8E', '#A68AC0']
+
+const formatTime = () =>
+  new Date().toLocaleTimeString('zh-CN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+
+const getAvatarColor = (seed: string) => {
+  const total = [...seed].reduce((sum, char) => sum + char.charCodeAt(0), 0)
+  return avatarPalette[total % avatarPalette.length]
+}
+
+const getAvatarLabel = (name: string, isGroup: boolean) => {
+  if (isGroup)
+    return '群'
+
+  return name.trim().slice(0, 1).toUpperCase() || '聊'
+}
+
+const createGroupId = () => String(Math.floor(100000 + Math.random() * 900000))
+
+const userProfiles = ref<UserProfile[]>([
+  { id: CURRENT_USER_ID, name: '我', account: 'me', avatar: '我', avatarColor: '#C4A882', online: true },
+  { id: 1, name: '林小溪', account: 'linxiaoxi', avatar: '林', avatarColor: '#91A896', online: true },
+  { id: 2, name: '张明', account: 'zhangming', avatar: '张', avatarColor: '#8097AA', online: true },
+  { id: 3, name: '王琳', account: 'wanglin', avatar: '王', avatarColor: '#CAA97F', online: true },
+  { id: 4, name: '陈思远', account: 'chensiyuan', avatar: '陈', avatarColor: '#D4A39B', online: true },
+  { id: 5, name: '李华', account: 'lihua', avatar: '李', avatarColor: '#8AA1B8', online: false },
+  { id: 6, name: '王佳宁', account: 'wangjianing', avatar: '王', avatarColor: '#8AA1B8', online: false },
+  { id: 7, name: '苏晓晴', account: 'suxiaoqing', avatar: '苏', avatarColor: '#C89289', online: false },
+  { id: 8, name: '周舟', account: 'zhouzhou', avatar: '周', avatarColor: '#7E9D8E', online: true },
+  { id: 9, name: '许诺', account: 'xunuo', avatar: '许', avatarColor: '#A68AC0', online: false },
+])
 
 const conversations = ref<Conversation[]>([
   {
@@ -42,36 +114,40 @@ const conversations = ref<Conversation[]>([
     name: '林小溪',
     avatar: '林',
     avatarColor: '#91A896',
-    lastMessage: '周末一起去爬山吧 🏔️',
+    lastMessage: '周末一起去爬山吗？',
     lastTime: '14:32',
     unread: 2,
     online: true,
     isGroup: false,
+    peerUserId: 1,
     messages: [
-      { id: 1, senderId: 1, senderName: '林小溪', content: '最近在忙什么呢？好久没联系了', time: '14:10', isMine: false },
-      { id: 2, senderId: 0, senderName: '我', content: '在做一个新的项目，挺有意思的', time: '14:15', isMine: true },
-      { id: 3, senderId: 1, senderName: '林小溪', content: '听起来不错！是什么类型的项目？', time: '14:18', isMine: false },
-      { id: 4, senderId: 0, senderName: '我', content: '一个即时通讯应用，界面设计上花了不少心思', time: '14:22', isMine: true },
-      { id: 5, senderId: 1, senderName: '林小溪', content: '哇，确实很适合做这类项目', time: '14:25', isMine: false },
-      { id: 6, senderId: 0, senderName: '我', content: '是的，组件化开发效率很高', time: '14:28', isMine: true },
-      { id: 7, senderId: 1, senderName: '林小溪', content: '周末一起去爬山吧 🏔️', time: '14:32', isMine: false },
+      { id: 1, senderId: 1, senderName: '林小溪', content: '最近在忙什么呀，好久没联系了。', time: '14:10', isMine: false },
+      { id: 2, senderId: 0, senderName: '我', content: '在做一个即时通讯项目，最近都在调界面。', time: '14:15', isMine: true },
+      { id: 3, senderId: 1, senderName: '林小溪', content: '那挺适合你呀，做得怎么样了？', time: '14:18', isMine: false },
+      { id: 4, senderId: 0, senderName: '我', content: '差不多了，还在优化聊天页细节。', time: '14:22', isMine: true },
+      { id: 5, senderId: 1, senderName: '林小溪', content: '周末一起去爬山吗？', time: '14:32', isMine: false },
     ],
   },
   {
     id: 2,
     name: '产品设计组',
-    avatar: '产',
+    avatar: '组',
     avatarColor: '#8097AA',
-    lastMessage: '[张明] 新版原型图已经上传了',
+    lastMessage: '[张明] 新版原型已经上传了',
     lastTime: '13:15',
     unread: 5,
     online: false,
     isGroup: true,
+    groupMeta: {
+      groupId: '602314',
+      memberIds: [CURRENT_USER_ID, 2, 3, 6],
+      memberCount: 4,
+    },
     messages: [
-      { id: 1, senderId: 2, senderName: '张明', content: '新版原型图已经上传了，大家可以开始看细节了', time: '12:42', isMine: false },
-      { id: 2, senderId: 3, senderName: '王琳', content: '整体节奏很好，配色也更统一了', time: '12:55', isMine: false },
-      { id: 3, senderId: 0, senderName: '我', content: '聊天页这块我会继续往柔和的方向调整', time: '13:06', isMine: true },
-      { id: 4, senderId: 2, senderName: '张明', content: '可以，重点把留白和圆角质感做出来', time: '13:15', isMine: false },
+      { id: 1, senderId: 2, senderName: '张明', content: '新版原型已经上传了，大家可以开始看细节。', time: '12:42', isMine: false },
+      { id: 2, senderId: 3, senderName: '王琳', content: '整体节奏挺好，颜色也更统一了。', time: '12:55', isMine: false },
+      { id: 3, senderId: 0, senderName: '我', content: '聊天页我会继续往更轻的方向调整。', time: '13:06', isMine: true },
+      { id: 4, senderId: 2, senderName: '张明', content: '可以，重点把圆角和留白做舒服。', time: '13:15', isMine: false },
     ],
   },
   {
@@ -84,24 +160,30 @@ const conversations = ref<Conversation[]>([
     unread: 0,
     online: true,
     isGroup: false,
+    peerUserId: 4,
     messages: [
-      { id: 1, senderId: 0, senderName: '我', content: '设计稿我发你了，帮我看下聊天页氛围够不够轻一点', time: '昨天', isMine: true },
-      { id: 2, senderId: 4, senderName: '陈思远', content: '收到，我看看', time: '昨天', isMine: false },
+      { id: 1, senderId: 0, senderName: '我', content: '我把设计稿发你了，帮我看看聊天页氛围够不够轻。', time: '昨天', isMine: true },
+      { id: 2, senderId: 4, senderName: '陈思远', content: '收到，我看看。', time: '昨天', isMine: false },
     ],
   },
   {
     id: 4,
     name: '读书会',
-    avatar: '读',
+    avatar: '书',
     avatarColor: '#D4A39B',
-    lastMessage: '[李华] 这个月的推荐书单出来了',
+    lastMessage: '[李华] 这周阅读主题发群里了',
     lastTime: '昨天',
     unread: 0,
     online: false,
     isGroup: true,
+    groupMeta: {
+      groupId: '458203',
+      memberIds: [CURRENT_USER_ID, 4, 5, 7],
+      memberCount: 4,
+    },
     messages: [
-      { id: 1, senderId: 5, senderName: '李华', content: '这个月的推荐书单出来了，大家挑一本感兴趣的吧', time: '昨天', isMine: false },
-      { id: 2, senderId: 0, senderName: '我', content: '我先看《设计中的留白》', time: '昨天', isMine: true },
+      { id: 1, senderId: 5, senderName: '李华', content: '这周阅读主题发群里了，大家有空可以先看。', time: '昨天', isMine: false },
+      { id: 2, senderId: 0, senderName: '我', content: '我先看《设计中的留白》。', time: '昨天', isMine: true },
     ],
   },
   {
@@ -114,24 +196,26 @@ const conversations = ref<Conversation[]>([
     unread: 0,
     online: false,
     isGroup: false,
+    peerUserId: 6,
     messages: [
-      { id: 1, senderId: 6, senderName: '王佳宁', content: '照片发给你了，看看效果怎么样', time: '周一', isMine: false },
-      { id: 2, senderId: 0, senderName: '我', content: '收到，整体氛围很好，色调也很干净', time: '周一', isMine: true },
+      { id: 1, senderId: 6, senderName: '王佳宁', content: '照片发给你了，看看效果怎么样。', time: '周一', isMine: false },
+      { id: 2, senderId: 0, senderName: '我', content: '收到，整体氛围不错，色调也很干净。', time: '周一', isMine: true },
     ],
   },
   {
     id: 6,
-    name: '苏晓晚',
+    name: '苏晓晴',
     avatar: '苏',
     avatarColor: '#C89289',
-    lastMessage: '好久不见呀！最近怎么样？',
+    lastMessage: '好久不见呀，最近怎么样？',
     lastTime: '上周',
     unread: 0,
     online: false,
     isGroup: false,
+    peerUserId: 7,
     messages: [
-      { id: 1, senderId: 7, senderName: '苏晓晚', content: '好久不见呀！最近怎么样？', time: '上周', isMine: false },
-      { id: 2, senderId: 0, senderName: '我', content: '在忙一个即时通讯项目，最近都在调界面', time: '上周', isMine: true },
+      { id: 1, senderId: 7, senderName: '苏晓晴', content: '好久不见呀，最近怎么样？', time: '上周', isMine: false },
+      { id: 2, senderId: 0, senderName: '我', content: '最近都在做这个聊天项目，细节改了不少。', time: '上周', isMine: true },
     ],
   },
 ])
@@ -139,16 +223,235 @@ const conversations = ref<Conversation[]>([
 const selectedConversationId = ref(1)
 
 const currentConversation = computed(() =>
-  conversations.value.find(conversation => conversation.id === selectedConversationId.value)
+  conversations.value.find(conversation => conversation.id === selectedConversationId.value),
 )
 
-const handleSelectConversation = (id: number) => {
-  selectedConversationId.value = id
+const friendUserIds = computed(() =>
+  conversations.value
+    .filter(conversation => !conversation.isGroup && typeof conversation.peerUserId === 'number')
+    .map(conversation => conversation.peerUserId as number),
+)
 
+const groupMembers = computed(() => {
+  const conversation = currentConversation.value
+
+  if (!conversation?.isGroup || !conversation.groupMeta)
+    return []
+
+  return conversation.groupMeta.memberIds
+    .map(memberId => userProfiles.value.find(profile => profile.id === memberId))
+    .filter((profile): profile is UserProfile => Boolean(profile))
+})
+
+const groupInviteCandidates = computed(() => {
+  const conversation = currentConversation.value
+
+  if (!conversation?.isGroup || !conversation.groupMeta)
+    return []
+
+  const memberIdSet = new Set(conversation.groupMeta.memberIds)
+
+  return userProfiles.value.filter(profile =>
+    profile.id !== CURRENT_USER_ID && !memberIdSet.has(profile.id),
+  )
+})
+
+const createConversation = (
+  name: string,
+  isGroup: boolean,
+  lastMessage: string,
+  options: {
+    avatar?: string
+    avatarColor?: string
+    online?: boolean
+    peerUserId?: number
+    groupMeta?: GroupMeta
+  } = {},
+): Conversation => {
+  const time = formatTime()
+
+  return {
+    id: Date.now() + Math.floor(Math.random() * 1000),
+    name,
+    avatar: options.avatar ?? getAvatarLabel(name, isGroup),
+    avatarColor: options.avatarColor ?? getAvatarColor(name),
+    lastMessage,
+    lastTime: time,
+    unread: 0,
+    online: options.online ?? !isGroup,
+    isGroup,
+    messages: [],
+    peerUserId: options.peerUserId,
+    groupMeta: options.groupMeta,
+  }
+}
+
+const getUserProfile = (userId: number) =>
+  userProfiles.value.find(profile => profile.id === userId)
+
+const createUserProfile = (account: string): UserProfile => {
+  const id = Math.max(...userProfiles.value.map(profile => profile.id), CURRENT_USER_ID) + 1
+  const profile: UserProfile = {
+    id,
+    name: account,
+    account,
+    avatar: getAvatarLabel(account, false),
+    avatarColor: getAvatarColor(account),
+    online: false,
+  }
+
+  userProfiles.value.push(profile)
+  return profile
+}
+
+const ensureDirectConversation = (profile: UserProfile, initialMessage: string) => {
+  const existingConversation = conversations.value.find(conversation =>
+    !conversation.isGroup && conversation.peerUserId === profile.id,
+  )
+
+  if (existingConversation)
+    return existingConversation
+
+  const conversation = createConversation(profile.name, false, initialMessage, {
+    avatar: profile.avatar,
+    avatarColor: profile.avatarColor,
+    online: profile.online,
+    peerUserId: profile.id,
+  })
+
+  conversations.value.unshift(conversation)
+  return conversation
+}
+
+const selectConversation = (conversation: Conversation) => {
+  selectedConversationId.value = conversation.id
+  conversation.unread = 0
+}
+
+const handleSelectConversation = (id: number) => {
   const selectedConversation = conversations.value.find(conversation => conversation.id === id)
 
-  if (selectedConversation) {
-    selectedConversation.unread = 0
+  if (!selectedConversation)
+    return
+
+  selectConversation(selectedConversation)
+}
+
+const handleAddContact = (account: string) => {
+  const matchedProfile = userProfiles.value.find(profile =>
+    profile.account === account || profile.name === account,
+  )
+  const profile = matchedProfile ?? createUserProfile(account)
+  const conversation = ensureDirectConversation(profile, '已添加为联系人，可以开始聊天了。')
+  selectConversation(conversation)
+}
+
+const handleCreateGroup = (payload: CreateGroupPayload) => {
+  const existingConversation = conversations.value.find(conversation =>
+    conversation.isGroup && conversation.name === payload.name,
+  )
+
+  if (existingConversation) {
+    selectConversation(existingConversation)
+    return
   }
+
+  const groupId = createGroupId()
+  const groupMeta: GroupMeta = {
+    groupId,
+    memberIds: [CURRENT_USER_ID, ...payload.memberIds],
+    memberCount: payload.memberIds.length + 1,
+  }
+
+  const conversation = createConversation(
+    payload.name,
+    true,
+    `群聊已创建，群号 ${groupId}`,
+    {
+      avatar: payload.avatar,
+      avatarColor: payload.avatarColor,
+      online: false,
+      groupMeta,
+    },
+  )
+
+  conversations.value.unshift(conversation)
+  selectConversation(conversation)
+}
+
+const handleJoinGroup = (groupCode: string) => {
+  const existingConversation = conversations.value.find(conversation =>
+    conversation.isGroup && conversation.groupMeta?.groupId === groupCode,
+  )
+
+  if (existingConversation) {
+    selectConversation(existingConversation)
+    return
+  }
+
+  const conversation = createConversation(
+    `群聊 ${groupCode}`,
+    true,
+    `已加入群聊 ${groupCode}`,
+    {
+      avatar: '群',
+      avatarColor: getAvatarColor(groupCode),
+      online: false,
+      groupMeta: {
+        groupId: groupCode,
+        memberIds: [CURRENT_USER_ID],
+        memberCount: 1,
+      },
+    },
+  )
+
+  conversations.value.unshift(conversation)
+  selectConversation(conversation)
+}
+
+const handleAddFriend = (userId: number) => {
+  const profile = getUserProfile(userId)
+
+  if (!profile)
+    return
+
+  ensureDirectConversation(profile, '已从群成员添加为好友，可以开始聊天了。')
+}
+
+const handleInviteGroupMembers = (payload: { conversationId: number, memberIds: number[] }) => {
+  const targetConversation = conversations.value.find(conversation =>
+    conversation.id === payload.conversationId && conversation.isGroup,
+  )
+
+  if (!targetConversation?.groupMeta)
+    return
+
+  const existingMemberIds = new Set(targetConversation.groupMeta.memberIds)
+  const newMemberIds = payload.memberIds.filter(memberId => !existingMemberIds.has(memberId))
+
+  if (!newMemberIds.length)
+    return
+
+  targetConversation.groupMeta.memberIds = [...targetConversation.groupMeta.memberIds, ...newMemberIds]
+  targetConversation.groupMeta.memberCount = targetConversation.groupMeta.memberIds.length
+
+  const invitedNames = newMemberIds
+    .map(memberId => getUserProfile(memberId)?.name)
+    .filter((name): name is string => Boolean(name))
+    .join('、')
+
+  const time = formatTime()
+
+  targetConversation.messages.push({
+    id: Date.now(),
+    senderId: CURRENT_USER_ID,
+    senderName: '我',
+    content: `邀请 ${invitedNames} 加入了群聊。`,
+    time,
+    isMine: true,
+  })
+
+  targetConversation.lastMessage = `你邀请了 ${invitedNames}`
+  targetConversation.lastTime = time
 }
 </script>

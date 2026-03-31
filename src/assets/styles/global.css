@@ -1,3 +1,65 @@
+:root {
+  --page-bg: #fafaf9;
+  --sidebar-bg: #fbfaf8;
+  --header-bg: rgba(252, 251, 249, 0.82);
+  --composer-bg: rgba(252, 251, 249, 0.84);
+  --header-backdrop: blur(18px) saturate(150%);
+  --composer-backdrop: blur(18px) saturate(150%);
+  --divider-color: rgba(0, 0, 0, 0.05);
+  --text-primary: #1a1a2e;
+  --text-soft: #4a4a5a;
+  --text-muted: #94a3b8;
+  --text-faint: #c8ccd0;
+  --brand-bg: #3d4f46;
+  --brand-hover: #6b8b7a;
+  --icon-color: #94a3b8;
+  --icon-hover-bg: rgba(61, 79, 70, 0.06);
+  --search-bg: #f5f2ed;
+  --tab-track-bg: rgba(0, 0, 0, 0.035);
+  --input-bg: rgba(255, 255, 255, 0.92);
+  --input-border: rgba(0, 0, 0, 0.04);
+  --input-hover-border: rgba(0, 0, 0, 0.08);
+  --input-focus-bg: rgba(255, 255, 255, 0.98);
+  --input-focus-border: rgba(143, 168, 154, 0.38);
+  --conversation-active-bg: #f1ece4;
+  --conversation-hover-bg: rgba(0, 0, 0, 0.025);
+  --conversation-active-shadow: 0 10px 24px rgba(44, 51, 46, 0.06);
+  --date-pill-bg: #f3f1ed;
+  --date-pill-text: #94a3b8;
+  --bubble-other-bg: rgba(255, 255, 255, 0.96);
+  --bubble-other-border: rgba(0, 0, 0, 0.04);
+  --bubble-other-text: #1a1a2e;
+  --bubble-mine-bg: #3d4f46;
+  --bubble-mine-text: #ffffff;
+  --bubble-mine-meta: rgba(255, 255, 255, 0.45);
+  --bubble-other-meta: #c8ccd0;
+  --surface-shadow: 0 10px 28px rgba(25, 32, 28, 0.04);
+  --send-disabled-bg: #f2efea;
+  --send-disabled-text: #c1c6cb;
+  --send-enabled-bg: #3d4f46;
+  --send-enabled-hover: #6b8b7a;
+  --send-enabled-shadow: 0 12px 24px rgba(61, 79, 70, 0.16);
+  --online-color: #46d7a4;
+  --online-ring: #fbfaf8;
+  --selection-bg: rgba(143, 168, 154, 0.24);
+  --widget-panel-bg: rgba(255, 255, 255, 0.76);
+  --widget-header-bg: rgba(255, 255, 255, 0.52);
+  --widget-header-glow: linear-gradient(135deg, rgba(143, 168, 154, 0.2), rgba(123, 147, 168, 0.08));
+  --widget-soft-bg: rgba(255, 255, 255, 0.54);
+  --widget-messages-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.16) 0%, rgba(250, 250, 249, 0.82) 100%);
+  --widget-border: rgba(0, 0, 0, 0.06);
+  --widget-border-strong: rgba(0, 0, 0, 0.08);
+  --widget-panel-shadow: 0 24px 60px rgba(25, 32, 28, 0.12);
+  --widget-avatar-bg: linear-gradient(135deg, rgba(143, 168, 154, 0.22), rgba(255, 255, 255, 0.92));
+  --widget-assistant-bubble-bg: rgba(255, 255, 255, 0.88);
+  --widget-user-bubble-bg: #3d4f46;
+  --widget-input-bg: rgba(255, 255, 255, 0.9);
+  --widget-toggle-bg: #3d4f46;
+  --widget-toggle-hover: #4f665b;
+  --widget-toggle-shadow: 0 18px 40px rgba(61, 79, 70, 0.22);
+  --widget-status-ring: rgba(255, 255, 255, 0.92);
+}
+
 *,
 *::before,
 *::after {
@@ -13,8 +75,8 @@ body,
 html {
   font-family: 'Outfit', 'Inter', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
   font-weight: 300;
-  color: #1A1A2E;
-  background: #FAFAF9;
+  color: var(--text-primary);
+  background: var(--page-bg);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -22,8 +84,9 @@ html {
 body {
   margin: 0;
   overflow: hidden;
-  background: #FAFAF9;
-  color: #1A1A2E;
+  background: var(--page-bg);
+  color: var(--text-primary);
+  transition: background-color 0.25s ease, color 0.25s ease;
 }
 
 button,
@@ -33,8 +96,8 @@ textarea {
 }
 
 ::selection {
-  background: rgba(143, 168, 154, 0.24);
-  color: #1A1A2E;
+  background: var(--selection-bg);
+  color: var(--text-primary);
 }
 
 ::-webkit-scrollbar {
@@ -86,14 +149,113 @@ button:focus-visible {
 }
 
 .el-input__wrapper {
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.04) !important;
+  background: var(--input-bg) !important;
+  box-shadow: 0 0 0 1px var(--input-border) !important;
   transition: all 0.25s ease !important;
 }
 
 .el-input__wrapper:hover {
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 0 0 1px var(--input-hover-border) !important;
 }
 
 .el-input__wrapper.is-focus {
-  box-shadow: 0 0 0 1px rgba(143, 168, 154, 0.34) !important;
+  background: var(--input-focus-bg) !important;
+  box-shadow: 0 0 0 1px var(--input-focus-border) !important;
+}
+
+.el-input__inner,
+.el-textarea__inner {
+  color: var(--text-primary) !important;
+}
+
+.el-input__inner::placeholder,
+.el-textarea__inner::placeholder {
+  color: var(--text-faint) !important;
+}
+
+.text-ink {
+  color: var(--text-primary) !important;
+}
+
+.text-ink-soft {
+  color: var(--text-soft) !important;
+}
+
+.text-ink-muted {
+  color: var(--text-muted) !important;
+}
+
+.text-ink-faint {
+  color: var(--text-faint) !important;
+}
+
+.text-primary {
+  color: var(--brand-bg) !important;
+}
+
+.bg-primary {
+  background: var(--brand-bg) !important;
+}
+
+body.dark-page {
+  --page-bg: #161a18;
+  --sidebar-bg: #161a18;
+  --header-bg: rgba(29, 35, 32, 0.94);
+  --composer-bg: linear-gradient(
+    180deg,
+    rgba(22, 26, 24, 0) 0%,
+    rgba(22, 26, 24, 0.72) 24%,
+    rgba(22, 26, 24, 0.94) 100%
+  );
+  --header-backdrop: none;
+  --composer-backdrop: none;
+  --divider-color: rgba(255, 255, 255, 0.06);
+  --text-primary: #f3f4f6;
+  --text-soft: #cfd5d1;
+  --text-muted: #8f9993;
+  --text-faint: #6f7a74;
+  --icon-color: #9aa7a0;
+  --icon-hover-bg: rgba(255, 255, 255, 0.05);
+  --search-bg: #252c28;
+  --tab-track-bg: rgba(255, 255, 255, 0.04);
+  --input-bg: #252c28;
+  --input-border: rgba(255, 255, 255, 0.08);
+  --input-hover-border: rgba(255, 255, 255, 0.12);
+  --input-focus-bg: #2b332e;
+  --input-focus-border: rgba(143, 168, 154, 0.34);
+  --conversation-active-bg: #252c28;
+  --conversation-hover-bg: rgba(255, 255, 255, 0.04);
+  --conversation-active-shadow: 0 14px 30px rgba(0, 0, 0, 0.22);
+  --date-pill-bg: #252c28;
+  --date-pill-text: #a8b1ab;
+  --bubble-other-bg: #232a26;
+  --bubble-other-border: rgba(255, 255, 255, 0.07);
+  --bubble-other-text: #f3f4f6;
+  --bubble-mine-bg: #34453d;
+  --bubble-mine-text: #f3f4f6;
+  --bubble-mine-meta: rgba(243, 244, 246, 0.45);
+  --bubble-other-meta: #8f9993;
+  --surface-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+  --send-disabled-bg: #252c28;
+  --send-disabled-text: #6f7a74;
+  --send-enabled-bg: #40564c;
+  --send-enabled-hover: #4a6358;
+  --send-enabled-shadow: 0 12px 24px rgba(0, 0, 0, 0.18);
+  --online-ring: #161a18;
+  --widget-panel-bg: rgba(23, 28, 25, 0.9);
+  --widget-header-bg: rgba(33, 40, 36, 0.78);
+  --widget-header-glow: linear-gradient(135deg, rgba(64, 86, 76, 0.45), rgba(36, 44, 39, 0.2));
+  --widget-soft-bg: rgba(28, 34, 31, 0.84);
+  --widget-messages-bg: linear-gradient(180deg, rgba(27, 32, 29, 0.4) 0%, rgba(22, 26, 24, 0.96) 100%);
+  --widget-border: rgba(255, 255, 255, 0.08);
+  --widget-border-strong: rgba(255, 255, 255, 0.12);
+  --widget-panel-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
+  --widget-avatar-bg: linear-gradient(135deg, rgba(64, 86, 76, 0.5), rgba(46, 56, 51, 0.9));
+  --widget-assistant-bubble-bg: #232a26;
+  --widget-user-bubble-bg: #40564c;
+  --widget-input-bg: #252c28;
+  --widget-toggle-bg: #40564c;
+  --widget-toggle-hover: #4a6358;
+  --widget-toggle-shadow: 0 18px 40px rgba(0, 0, 0, 0.26);
+  --widget-status-ring: rgba(22, 26, 24, 0.92);
 }
