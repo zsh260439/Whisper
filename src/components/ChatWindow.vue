@@ -1,145 +1,161 @@
 <template>
-  <main class="flex-1 min-w-0 flex flex-col h-full bg-surface-warm">
+  <main class="flex min-w-0 flex-1 flex-col bg-[#fcfbf9]">
     <template v-if="conversation">
-      <!-- Header -->
-      <header class="flex items-center justify-between px-6 py-3 border-b border-ink-faint/20" style="backdrop-filter: blur(12px); background: rgba(250, 250, 249, 0.85);">
+      <header class="chat-header">
         <div class="flex items-center gap-3">
           <div
-            class="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-light"
+            class="flex h-10 w-10 items-center justify-center rounded-full text-sm text-white"
             :style="{ backgroundColor: conversation.avatarColor }"
           >
             {{ conversation.avatar }}
           </div>
+
           <div>
-            <h3 class="text-sm font-normal text-ink">{{ conversation.name }}</h3>
-            <p class="text-xs font-light flex items-center gap-1" :class="conversation.online ? 'text-green-500' : 'text-ink-muted'">
-              <span class="w-1.5 h-1.5 rounded-full" :class="conversation.online ? 'bg-green-400' : 'bg-ink-faint'" />
+            <h2 class="text-[17px] tracking-wide text-ink">{{ conversation.name }}</h2>
+            <p class="mt-1 flex items-center gap-1 text-xs font-light" :class="conversation.online ? 'text-[#49c893]' : 'text-ink-faint'">
+              <span class="h-1.5 w-1.5 rounded-full" :class="conversation.online ? 'bg-[#49c893]' : 'bg-ink-faint'" />
               {{ conversation.online ? '在线' : '离线' }}
             </p>
           </div>
         </div>
+
         <div class="flex items-center gap-1">
-          <button class="w-9 h-9 rounded-lg flex items-center justify-center text-ink-muted hover:text-ink hover:bg-primary-50 transition-all duration-200">
-            <i class="carbon:phone text-lg" />
+          <button class="window-icon-btn" type="button" aria-label="语音通话">
+            <i class="i-carbon-phone text-lg" />
           </button>
-          <button class="w-9 h-9 rounded-lg flex items-center justify-center text-ink-muted hover:text-ink hover:bg-primary-50 transition-all duration-200">
-            <i class="carbon:video text-lg" />
+          <button class="window-icon-btn" type="button" aria-label="视频通话">
+            <i class="i-carbon-video text-lg" />
           </button>
-          <button class="w-9 h-9 rounded-lg flex items-center justify-center text-ink-muted hover:text-ink hover:bg-primary-50 transition-all duration-200">
-            <i class="carbon:search text-lg" />
+          <button class="window-icon-btn" type="button" aria-label="搜索消息">
+            <i class="i-carbon-search text-lg" />
           </button>
-          <button class="w-9 h-9 rounded-lg flex items-center justify-center text-ink-muted hover:text-ink hover:bg-primary-50 transition-all duration-200">
-            <i class="carbon:overflow-menu-vertical text-lg" />
+          <button class="window-icon-btn" type="button" aria-label="更多操作">
+            <i class="i-carbon-overflow-menu-vertical text-lg" />
           </button>
         </div>
       </header>
 
-      <!-- Messages Area -->
-      <div ref="messagesContainer" class="flex-1 overflow-y-auto px-6 py-4">
-        <!-- Date Separator -->
-        <div class="flex items-center justify-center mb-6">
-          <span class="px-3 py-1 rounded-full bg-primary-50 text-xs text-ink-muted font-light">今天</span>
-        </div>
+      <div ref="messagesContainer" class="flex-1 overflow-y-auto px-8 py-8">
+        <div class="mx-auto max-w-[920px]">
+          <div class="mb-8 flex items-center justify-center">
+            <span class="rounded-full bg-[#f3f1ed] px-3 py-1 text-xs font-light tracking-wide text-ink-muted">
+              今天
+            </span>
+          </div>
 
-        <div class="space-y-3">
-          <div
-            v-for="msg in conversation.messages"
-            :key="msg.id"
-            class="flex"
-            :class="msg.isMine ? 'justify-end' : 'justify-start'"
-          >
-            <!-- Others' avatar -->
-            <div v-if="!msg.isMine" class="flex-shrink-0 mr-3 self-end">
+          <div class="space-y-5">
+            <div
+              v-for="(message, index) in conversation.messages"
+              :key="`${conversation.id}-${message.id}`"
+              class="message-item flex items-start gap-4"
+              :class="message.isMine ? 'justify-end' : 'justify-start'"
+              :style="{ animationDelay: getMessageAnimationDelay(index) }"
+            >
               <div
-                v-if="!conversation.isGroup || !msg.isMine"
-                class="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-light"
+                v-if="!message.isMine"
+                class="mb-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs text-white"
                 :style="{ backgroundColor: conversation.avatarColor }"
               >
                 {{ conversation.avatar }}
               </div>
-            </div>
 
-            <div class="max-w-xs lg:max-w-md">
-              <!-- Group sender name -->
-              <p v-if="conversation.isGroup && !msg.isMine" class="text-xs text-primary-400 font-light mb-1 ml-1">
-                {{ msg.senderName }}
-              </p>
+              <div class="max-w-[280px] sm:max-w-[320px] lg:max-w-[340px]">
+                <div
+                  class="message-bubble"
+                  :class="message.isMine ? 'message-bubble--mine' : 'message-bubble--other'"
+                >
+                  <p class="text-[15px] leading-[1.75]">
+                    {{ message.content }}
+                  </p>
 
-              <!-- Message Bubble -->
-              <div
-                class="px-4 py-2.5 text-sm font-light leading-relaxed"
-                :class="msg.isMine
-                  ? 'bg-primary text-white rounded-2xl rounded-tr-md'
-                  : 'bg-surface border border-ink-faint/20 text-ink rounded-2xl rounded-tl-md'"
-              >
-                {{ msg.content }}
+                  <div class="mt-1.5 flex items-center gap-1" :class="message.isMine ? 'justify-end text-white/45' : 'justify-end text-ink-faint'">
+                    <span class="text-[11px]">{{ message.time }}</span>
+                    <i v-if="message.isMine" class="i-carbon-checkmark text-[12px]" />
+                  </div>
+                </div>
               </div>
 
-              <!-- Time & Status -->
-              <div class="flex items-center gap-1 mt-1" :class="msg.isMine ? 'justify-end' : 'justify-start'">
-                <span class="text-xs text-ink-faint font-light">{{ msg.time }}</span>
-                <i v-if="msg.isMine" class="carbon:checkmark text-xs text-primary-300" />
+              <div
+                v-if="message.isMine"
+                class="mb-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs text-white"
+                style="background-color: #C4A882;"
+              >
+                我
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Input Area -->
-      <div class="border-t border-ink-faint/20 px-6 py-4" style="backdrop-filter: blur(12px); background: rgba(250, 250, 249, 0.85);">
-        <!-- Toolbar -->
-        <div class="flex items-center gap-1 mb-3">
-          <button
-            v-for="tool in tools"
-            :key="tool.icon"
-            class="w-8 h-8 rounded-lg flex items-center justify-center text-ink-muted hover:text-ink hover:bg-primary-50 transition-all duration-200"
-          >
-            <i :class="tool.icon" class="text-lg" />
-          </button>
+      <div class="chat-composer">
+        <div class="px-8 pt-3">
+          <div class="mx-auto flex max-w-[920px] items-center gap-1">
+            <button class="window-icon-btn window-icon-btn--sm" type="button" aria-label="表情">
+              <i class="i-carbon-face-satisfied text-lg" />
+            </button>
+            <button class="window-icon-btn window-icon-btn--sm" type="button" aria-label="图片">
+              <i class="i-carbon-image text-lg" />
+            </button>
+            <button class="window-icon-btn window-icon-btn--sm" type="button" aria-label="文件">
+              <i class="i-carbon-document text-lg" />
+            </button>
+            <button class="window-icon-btn window-icon-btn--sm" type="button" aria-label="截图">
+              <i class="i-carbon-crop text-lg" />
+            </button>
+            <button class="window-icon-btn window-icon-btn--sm" type="button" aria-label="语音">
+              <i class="i-carbon-microphone text-lg" />
+            </button>
+          </div>
         </div>
 
-        <!-- Textarea -->
-        <el-input
-          v-model="messageText"
-          type="textarea"
-          :autosize="{ minRows: 1, maxRows: 4 }"
-          placeholder="输入消息..."
-          resize="none"
-          class="chat-textarea"
-        />
+        <div class="px-8 pt-2">
+          <div class="mx-auto max-w-[920px]">
+            <el-input
+              v-model="messageText"
+              class="message-input"
+              type="textarea"
+              resize="none"
+              :autosize="{ minRows: 1, maxRows: 4 }"
+              placeholder="输入消息..."
+              @keydown.enter.exact.prevent="sendMessage"
+            />
+          </div>
+        </div>
 
-        <!-- Bottom Bar -->
-        <div class="flex items-center justify-between mt-3">
-          <span class="text-xs text-ink-faint font-light">Enter 发送 · Shift+Enter 换行</span>
-          <button
-            class="px-5 py-2 rounded-xl text-sm font-light tracking-wider transition-all duration-300"
-            :class="messageText.trim()
-              ? 'bg-primary text-white hover:bg-primary-400'
-              : 'bg-ink-faint/30 text-ink-muted cursor-not-allowed'"
-            :disabled="!messageText.trim()"
-            @click="sendMessage"
-          >
-            发送
-          </button>
+        <div class="px-8 pb-4 pt-3">
+          <div class="mx-auto flex max-w-[920px] items-center justify-between gap-4">
+            <span class="text-xs font-light tracking-wide text-ink-faint">Enter 发送 · Shift+Enter 换行</span>
+
+            <button
+              class="send-btn"
+              :class="messageText.trim()
+                ? 'bg-primary text-white shadow-[0_12px_24px_rgba(61,79,70,0.16)] hover:bg-primary-400'
+                : 'bg-[#f2efea] text-[#c1c6cb] cursor-not-allowed'"
+              :disabled="!messageText.trim()"
+              type="button"
+              @click="sendMessage"
+            >
+              发送
+            </button>
+          </div>
         </div>
       </div>
     </template>
 
-    <!-- Empty State -->
-    <div v-else class="flex-1 flex items-center justify-center">
-      <div class="text-center animate-fade-in">
-        <div class="w-20 h-20 rounded-3xl bg-primary-50 flex items-center justify-center mx-auto mb-6">
-          <i class="carbon:chat text-3xl text-primary-300" />
+    <div v-else class="flex flex-1 items-center justify-center">
+      <div class="rounded-[28px] border border-black/5 bg-white/70 px-10 py-12 text-center shadow-[0_16px_40px_rgba(25,32,28,0.04)]">
+        <div class="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-3xl bg-primary/8 text-primary">
+          <i class="i-carbon-chat text-3xl" />
         </div>
-        <h3 class="text-lg font-light text-ink mb-2">选择一个对话</h3>
-        <p class="text-sm text-ink-muted font-light">从左侧列表选择一个联系人开始聊天</p>
+        <h3 class="text-lg text-ink">选择一个会话</h3>
+        <p class="mt-2 text-sm font-light text-ink-muted">从左侧列表打开联系人，开始新的对话。</p>
       </div>
     </div>
   </main>
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, watch } from 'vue'
+import { nextTick, ref, watch } from 'vue'
 import type { Conversation } from '@/views/ChatPage.vue'
 
 const props = defineProps<{
@@ -149,55 +165,169 @@ const props = defineProps<{
 const messageText = ref('')
 const messagesContainer = ref<HTMLDivElement>()
 
-const tools = [
-  { icon: 'carbon:face-satisfied' },
-  { icon: 'carbon:image' },
-  { icon: 'carbon:document' },
-  { icon: 'carbon:screenshot' },
-  { icon: 'carbon:microphone' },
-]
-
-const scrollToBottom = async () => {
+const scrollToBottom = async (behavior: ScrollBehavior = 'auto') => {
   await nextTick()
-  if (messagesContainer.value) {
-    messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
-  }
+
+  if (!messagesContainer.value)
+    return
+
+  messagesContainer.value.scrollTo({
+    top: messagesContainer.value.scrollHeight,
+    behavior,
+  })
 }
 
-watch(() => props.conversation?.id, () => {
-  scrollToBottom()
-})
+watch(
+  () => [props.conversation?.id, props.conversation?.messages.length],
+  () => {
+    scrollToBottom()
+  },
+  { immediate: true },
+)
 
-const sendMessage = () => {
-  if (!messageText.value.trim() || !props.conversation) return
+const sendMessage = async () => {
+  const content = messageText.value.trim()
+
+  if (!content || !props.conversation)
+    return
+
+  const time = new Date().toLocaleTimeString('zh-CN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+
+  props.conversation.messages.push({
+    id: Date.now(),
+    senderId: 0,
+    senderName: '我',
+    content,
+    time,
+    isMine: true,
+  })
+
+  props.conversation.lastMessage = content
+  props.conversation.lastTime = time
+  props.conversation.unread = 0
+
   messageText.value = ''
-  scrollToBottom()
+  await scrollToBottom('smooth')
 }
+
+const getMessageAnimationDelay = (index: number) =>
+  `${0.1 + Math.min(index, 6) * 0.08}s`
 </script>
 
-<style>
-.chat-textarea .el-textarea__inner {
-  padding: 12px 16px !important;
-  border-radius: 12px !important;
-  border: 1px solid rgba(0,0,0,0.04) !important;
-  background: rgba(255, 255, 255, 0.8) !important;
-  font-family: 'Outfit', 'Inter', system-ui, sans-serif !important;
-  font-weight: 300 !important;
+<style scoped>
+.chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 28px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  background: rgba(252, 251, 249, 0.82);
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+}
+
+.chat-composer {
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
+  background: rgba(252, 251, 249, 0.84);
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+}
+
+.window-icon-btn {
+  display: inline-flex;
+  height: 38px;
+  width: 38px;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 14px;
+  background: transparent;
+  color: #9aa8b5;
+  transition: all 0.25s ease;
+}
+
+.window-icon-btn:hover {
+  background: rgba(61, 79, 70, 0.06);
+  color: #3d4f46;
+}
+
+.window-icon-btn--sm {
+  height: 34px;
+  width: 34px;
+  border-radius: 12px;
+}
+
+.message-bubble {
+  padding: 11px 14px 10px;
+  border-radius: 20px;
+  box-shadow: 0 10px 28px rgba(25, 32, 28, 0.04);
+}
+
+.message-item {
+  animation: message-slide-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.message-bubble--mine {
+  border-top-right-radius: 8px;
+  background: #3d4f46;
+  color: #ffffff;
+}
+
+.message-bubble--other {
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  border-top-left-radius: 8px;
+  background: rgba(255, 255, 255, 0.96);
+  color: #1a1a2e;
+}
+
+.message-input :deep(.el-textarea__inner) {
+  padding: 13px 18px !important;
+  border: none !important;
+  border-radius: 20px !important;
+  background: rgba(255, 255, 255, 0.92) !important;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.04) !important;
   font-size: 14px !important;
-  line-height: 1.6 !important;
-  color: #1A1A2E !important;
-  letter-spacing: 0.02em !important;
-  box-shadow: none !important;
-  transition: all 0.3s ease;
+  line-height: 1.7 !important;
+  color: #1a1a2e !important;
+  transition: all 0.25s ease !important;
 }
 
-.chat-textarea .el-textarea__inner:focus {
-  border-color: rgba(143, 168, 154, 0.5) !important;
-  box-shadow: none !important;
+.message-input :deep(.el-textarea__inner:hover) {
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.07) !important;
 }
 
-.chat-textarea .el-textarea__inner::placeholder {
-  color: #C8CCD0 !important;
+.message-input :deep(.el-textarea__inner:focus) {
+  background: rgba(255, 255, 255, 0.98) !important;
+  box-shadow: 0 0 0 1px rgba(143, 168, 154, 0.38) !important;
+}
+
+.message-input :deep(.el-textarea__inner::placeholder) {
+  color: #c3c8ce !important;
   font-weight: 300 !important;
+}
+
+.send-btn {
+  border: none;
+  border-radius: 16px;
+  padding: 10px 22px;
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  transition: all 0.25s ease;
+}
+
+@keyframes message-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 </style>

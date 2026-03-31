@@ -1,121 +1,141 @@
 <template>
-  <aside class="w-340px h-full flex flex-col border-r border-ink-faint/30 bg-surface-warm">
-    <!-- Header -->
-    <div class="flex items-center justify-between px-5 py-4 border-b border-ink-faint/20">
-      <div class="flex items-center gap-2.5">
-        <div class="w-9 h-9 rounded-xl bg-primary flex items-center justify-center">
-          <span class="text-sm font-light text-white">W</span>
-        </div>
-        <span class="text-sm font-light tracking-wider text-ink">Whisper · 轻语</span>
-      </div>
-      <div class="flex items-center gap-1">
-        <button class="w-8 h-8 rounded-lg flex items-center justify-center text-ink-muted hover:text-ink hover:bg-primary-50 transition-all duration-200">
-          <i class="carbon:add text-lg" />
-        </button>
-        <button class="w-8 h-8 rounded-lg flex items-center justify-center text-ink-muted hover:text-ink hover:bg-primary-50 transition-all duration-200">
-          <i class="carbon:settings text-lg" />
-        </button>
-      </div>
-    </div>
-
-    <!-- Search -->
-    <div class="px-4 py-3">
-      <el-input
-        v-model="searchQuery"
-        placeholder="搜索联系人..."
-        clearable
-        size="default"
-        :prefix-icon="Search"
-      />
-    </div>
-
-    <!-- Tabs -->
-    <div class="px-4 mb-2 relative">
-      <div class="flex relative">
-        <button
-          v-for="(tab, idx) in tabs"
-          :key="tab.key"
-          class="flex-1 py-2 text-xs font-light tracking-wider text-center transition-colors duration-300"
-          :class="activeTab === tab.key ? 'text-ink' : 'text-ink-muted hover:text-ink-soft'"
-          @click="activeTab = tab.key"
-        >
-          {{ tab.label }}
-        </button>
-      </div>
-      <!-- Sliding indicator -->
-      <div
-        class="absolute bottom-0 h-0.5 bg-primary rounded-full transition-all duration-300 ease-out"
-        :style="tabIndicatorStyle"
-      />
-    </div>
-
-    <!-- Conversation List -->
-    <div class="flex-1 overflow-y-auto px-2">
-      <div
-        v-for="conv in filteredConversations"
-        :key="conv.id"
-        class="flex items-center gap-3 px-3 py-3 rounded-xl cursor-pointer transition-all duration-200 mb-0.5"
-        :class="conv.id === selectedId ? 'bg-primary-50' : 'hover:bg-black/2'"
-        @click="$emit('select', conv.id)"
-      >
-        <!-- Avatar -->
-        <div class="relative flex-shrink-0">
-          <div
-            class="w-11 h-11 rounded-full flex items-center justify-center text-white text-sm font-light"
-            :style="{ backgroundColor: conv.avatarColor }"
-          >
-            {{ conv.avatar }}
-          </div>
-          <div
-            v-if="conv.online"
-            class="absolute bottom-0 right-0 w-3 h-3 bg-green-400 rounded-full border-2 border-surface-warm"
-          />
-        </div>
-
-        <!-- Info -->
-        <div class="flex-1 min-w-0">
-          <div class="flex items-center justify-between mb-1">
-            <span class="text-sm font-normal text-ink truncate">{{ conv.name }}</span>
-            <span class="text-xs text-ink-muted font-light flex-shrink-0 ml-2">{{ conv.lastTime }}</span>
-          </div>
-          <div class="flex items-center justify-between">
-            <span class="text-xs text-ink-muted font-light truncate">{{ conv.lastMessage }}</span>
-            <el-badge
-              v-if="conv.unread > 0"
-              :value="conv.unread"
-              :max="99"
-              class="flex-shrink-0 ml-2"
-            />
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Footer -->
-    <div class="flex items-center justify-between px-5 py-3 border-t border-ink-faint/20">
-      <div class="flex items-center gap-3">
-        <div class="w-9 h-9 rounded-full bg-primary flex items-center justify-center text-white text-sm font-light">
-          我
+  <aside class="h-full flex flex-col border-r border-black/5 bg-[#fbfaf8]" style="width: 340px; min-width: 340px;">
+    <div class="px-4 pt-5 pb-4 border-b border-black/4">
+      <div class="mb-4 flex items-center gap-3">
+        <div class="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary text-sm text-white shadow-[0_10px_24px_rgba(61,79,70,0.12)]">
+          W
         </div>
         <div>
-          <p class="text-sm font-normal text-ink">我的账号</p>
-          <p class="text-xs text-ink-muted font-light flex items-center gap-1">
-            <span class="w-1.5 h-1.5 rounded-full bg-green-400" />
+          <h1 class="text-[18px] leading-none tracking-wide text-ink">Whisper</h1>
+          <p class="mt-1 text-xs font-light tracking-[0.18em] text-ink-muted">轻语</p>
+        </div>
+
+        <div class="ml-auto flex items-center gap-1">
+          <button class="sidebar-icon-btn" type="button" aria-label="新建会话">
+            <i class="i-carbon-add text-lg" />
+          </button>
+          <button class="sidebar-icon-btn" type="button" aria-label="设置">
+            <i class="i-carbon-settings text-lg" />
+          </button>
+        </div>
+      </div>
+
+      <el-input
+        v-model="searchQuery"
+        class="search-input"
+        placeholder="搜索联系人或消息..."
+        clearable
+        :prefix-icon="Search"
+      />
+
+      <div class="relative mt-4">
+        <div class="absolute bottom-0 left-0 right-0 h-px bg-black/[0.05]" />
+        <div class="relative flex items-center gap-1">
+          <button
+            v-for="tab in tabs"
+            :key="tab.key"
+            class="relative z-10 flex-1 px-2 py-2.5 text-sm tracking-wide transition-all duration-300"
+            :class="activeTab === tab.key
+              ? 'text-[#263229]'
+              : 'text-ink-muted hover:text-ink-soft'"
+            type="button"
+            @click="activeTab = tab.key"
+          >
+            {{ tab.label }}
+          </button>
+        </div>
+        <div
+          class="absolute bottom-0 left-0 h-[2px] rounded-full bg-primary transition-all duration-400 ease-[cubic-bezier(0.16,1,0.3,1)]"
+          :style="tabIndicatorStyle"
+        />
+      </div>
+    </div>
+
+    <div class="flex-1 overflow-y-auto px-3 py-3">
+      <template v-if="filteredConversations.length">
+        <button
+          v-for="conversation in filteredConversations"
+          :key="conversation.id"
+          class="mb-1.5 flex w-full items-center gap-3 rounded-[20px] px-3 py-3 text-left transition-all duration-300"
+          :class="conversation.id === selectedId
+            ? 'bg-[#f1ece4] shadow-[0_10px_24px_rgba(44,51,46,0.06)]'
+            : 'hover:bg-black/[0.025]'"
+          type="button"
+          @click="$emit('select', conversation.id)"
+        >
+          <div class="relative shrink-0">
+            <div
+              class="flex h-11 w-11 items-center justify-center rounded-full text-sm text-white"
+              :style="{ backgroundColor: conversation.avatarColor }"
+            >
+              {{ conversation.avatar }}
+            </div>
+            <span
+              v-if="conversation.online"
+              class="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-[#fbfaf8] bg-[#46d7a4]"
+            />
+          </div>
+
+          <div class="min-w-0 flex-1">
+            <div class="mb-1 flex items-start justify-between gap-2">
+              <span class="truncate text-[15px] tracking-wide text-ink">{{ conversation.name }}</span>
+              <span
+                class="shrink-0 text-[11px]"
+                :class="conversation.unread > 0 ? 'text-primary' : 'text-ink-faint'"
+              >
+                {{ conversation.lastTime }}
+              </span>
+            </div>
+
+            <div class="flex items-center justify-between gap-2">
+              <p class="truncate text-xs font-light leading-relaxed text-ink-muted">
+                {{ conversation.lastMessage }}
+              </p>
+              <span
+                v-if="conversation.unread > 0"
+                class="inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] text-white"
+              >
+                {{ conversation.unread }}
+              </span>
+            </div>
+          </div>
+        </button>
+      </template>
+
+      <div v-else class="flex h-full items-center justify-center px-6 text-center">
+        <div>
+          <p class="text-sm text-ink-soft">当前分类暂无内容</p>
+          <p class="mt-1 text-xs font-light text-ink-faint">切回“消息”或修改搜索关键词试试</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="border-t border-black/5 px-4 py-4">
+      <div class="flex items-center gap-3 rounded-[18px] px-2">
+        <div class="flex h-10 w-10 items-center justify-center rounded-full bg-[#C4A882] text-sm text-white">
+          我
+        </div>
+
+        <div class="min-w-0 flex-1">
+          <p class="truncate text-sm tracking-wide text-ink">我的账号</p>
+          <p class="mt-1 flex items-center gap-1 text-xs font-light text-ink-muted">
+            <span class="h-1.5 w-1.5 rounded-full bg-[#46d7a4]" />
             在线
           </p>
         </div>
+
+        <button class="sidebar-icon-btn" type="button" aria-label="切换主题">
+          <i class="i-carbon-moon text-base" />
+        </button>
       </div>
-      <button class="w-8 h-8 rounded-lg flex items-center justify-center text-ink-muted hover:text-ink hover:bg-primary-50 transition-all duration-200">
-        <i class="carbon:moon text-lg" />
-      </button>
     </div>
   </aside>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import type { Conversation } from '@/views/ChatPage.vue'
+import { computed, ref } from 'vue'
 import { Search } from '@element-plus/icons-vue'
+import type { Conversation } from '@/views/ChatPage.vue'
 
 const props = defineProps<{
   conversations: Conversation[]
@@ -136,19 +156,71 @@ const activeTab = ref('messages')
 const searchQuery = ref('')
 
 const tabIndicatorStyle = computed(() => {
-  const idx = tabs.findIndex(t => t.key === activeTab.value)
+  const activeIndex = tabs.findIndex(tab => tab.key === activeTab.value)
+
   return {
-    left: `${(idx * 100) / tabs.length}%`,
     width: `${100 / tabs.length}%`,
+    transform: `translateX(${activeIndex * 100}%)`,
   }
 })
 
 const filteredConversations = computed(() => {
-  if (activeTab.value !== 'messages') return []
-  if (!searchQuery.value.trim()) return props.conversations
-  const q = searchQuery.value.toLowerCase()
-  return props.conversations.filter(c =>
-    c.name.toLowerCase().includes(q) || c.lastMessage.toLowerCase().includes(q)
+  if (activeTab.value !== 'messages')
+    return []
+
+  const keyword = searchQuery.value.trim().toLowerCase()
+
+  if (!keyword)
+    return props.conversations
+
+  return props.conversations.filter(conversation =>
+    conversation.name.toLowerCase().includes(keyword)
+    || conversation.lastMessage.toLowerCase().includes(keyword),
   )
 })
 </script>
+
+<style scoped>
+.sidebar-icon-btn {
+  display: inline-flex;
+  height: 36px;
+  width: 36px;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 14px;
+  background: transparent;
+  color: #94a3b8;
+  transition: all 0.25s ease;
+}
+
+.sidebar-icon-btn:hover {
+  background: rgba(61, 79, 70, 0.06);
+  color: #3d4f46;
+}
+
+.search-input :deep(.el-input__wrapper) {
+  padding: 0 16px;
+  border-radius: 999px;
+  background: #f5f2ed;
+  box-shadow: inset 0 0 0 1px rgba(61, 79, 70, 0.04);
+}
+
+.search-input :deep(.el-input__wrapper:hover) {
+  box-shadow: inset 0 0 0 1px rgba(61, 79, 70, 0.08);
+}
+
+.search-input :deep(.el-input__wrapper.is-focus) {
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 0 0 1px rgba(143, 168, 154, 0.35);
+}
+
+.search-input :deep(.el-input__inner) {
+  height: 42px;
+  font-size: 13px;
+}
+
+.search-input :deep(.el-input__prefix-inner) {
+  color: #c2c8cd;
+}
+</style>

@@ -8,9 +8,28 @@ export default defineConfig({
     presetIcons({
       scale: 1.2,
       warn: true,
+      collections: {
+        carbon: () => import('@iconify-json/carbon/icons.json').then(i => i.default),
+      },
     }),
   ],
   transformers: [transformerDirectives()],
+  safelist: [
+    'i-carbon-add',
+    'i-carbon-settings',
+    'i-carbon-moon',
+    'i-carbon-phone',
+    'i-carbon-video',
+    'i-carbon-search',
+    'i-carbon-overflow-menu-vertical',
+    'i-carbon-face-satisfied',
+    'i-carbon-image',
+    'i-carbon-document',
+    'i-carbon-crop',
+    'i-carbon-microphone',
+    'i-carbon-checkmark',
+    'i-carbon-chat',
+  ],
   theme: {
     colors: {
       // Whisper primary palette (Nordic sage green)
