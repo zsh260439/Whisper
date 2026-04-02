@@ -1,1 +1,8 @@
 node_modules
+dist/
+.claude/
+*.log
+docs/chat-page.png
+docs/login-page-reference-layout.png
+docs/login-page-updated.png
+docs/login-page.png
