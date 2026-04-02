@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
 const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     {
       path: '/',
@@ -10,12 +10,14 @@ const router = createRouter({
     {
       path: '/login',
       name: 'Login',
-      component: () => import('@/views/LoginPage.vue'),
+      component: () => import('@/views/Login/index.vue'),
+      meta: { title: '登录' },
     },
     {
       path: '/chat',
-      name: 'Chat',
-      component: () => import('@/views/ChatPage.vue'),
+      name: 'Room',
+      component: () => import('@/views/Room/index.vue'),
+      meta: { title: '聊天' },
     },
   ],
 })
