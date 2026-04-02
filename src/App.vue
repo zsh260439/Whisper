@@ -4,16 +4,7 @@
       <component :is="Component" />
     </transition>
   </router-view>
-
-  <FloatingChatWidget v-if="route.path === '/chat'" />
 </template>
-
-<script setup lang="ts">
-import FloatingChatWidget from '@/components/ui/FloatingChatWidget.vue'
-import { useRoute } from 'vue-router'
-
-const route = useRoute()
-</script>
 
 <style>
 .page-fade-enter-active,

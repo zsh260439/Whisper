@@ -119,19 +119,25 @@
       </div>
 
       <div class="sidebar-footer border-t px-4 py-4">
-        <div class="flex items-center gap-3 rounded-[18px] px-2">
-          <div class="flex h-10 w-10 items-center justify-center rounded-full bg-[#C4A882] text-sm text-white">
-            我
-          </div>
+        <button class="profile-card" type="button" aria-label="编辑个人资料" @click="openProfileDialog">
+          <UserAvatar
+            class="profile-card__avatar"
+            :label="currentUser.avatar"
+            :color="currentUser.avatarColor"
+            :image-url="currentUser.avatarImageUrl"
+            :size="40"
+            alt="我的头像"
+          />
 
           <div class="min-w-0 flex-1">
-            <p class="truncate text-sm tracking-wide text-ink">我的账号</p>
-            <p class="mt-1 flex items-center gap-1 text-xs font-light text-ink-muted">
-              <span class="h-1.5 w-1.5 rounded-full bg-[#46d7a4]" />
-              在线
+            <p class="truncate text-sm tracking-wide text-ink">{{ currentUser.name }}</p>
+            <p class="profile-card__meta">
+              <span class="profile-card__status" :class="currentUser.online ? 'profile-card__status--online' : ''" />
+              {{ currentUser.online ? '在线' : '离线' }}
+              <span v-if="currentUser.signature.trim()" class="truncate">· {{ currentUser.signature }}</span>
             </p>
           </div>
-        </div>
+        </button>
       </div>
     </div>
   </aside>
@@ -282,12 +288,100 @@
       </div>
     </template>
   </el-dialog>
+
+  <el-dialog
+    v-model="profileDialogVisible"
+    width="420px"
+    align-center
+    class="sidebar-dialog"
+    title="编辑个人资料"
+  >
+    <div class="dialog-copy">
+      <p class="dialog-title">修改你的公开资料</p>
+      <p class="dialog-desc">目前支持修改头像、名称和个性签名，账号 ID 先保持只读。</p>
+    </div>
+
+    <div class="dialog-section">
+      <p class="dialog-section__title">头像</p>
+
+      <div class="profile-avatar-editor">
+        <UserAvatar
+          class="profile-avatar-editor__preview"
+          :label="profileAvatarLabel"
+          :color="currentUser.avatarColor"
+          :image-url="profileForm.avatarImageUrl"
+          :size="72"
+          alt="头像预览"
+        />
+
+        <div class="min-w-0 flex-1">
+          <p class="text-sm text-ink">上传一张图片作为头像</p>
+          <p class="mt-1 text-xs font-light text-ink-faint">不上传时继续使用默认文字头像。</p>
+
+          <div class="profile-avatar-editor__actions">
+            <el-button type="primary" plain @click="openProfileAvatarPicker">
+              上传头像
+            </el-button>
+            <el-button :disabled="!profileForm.avatarImageUrl" @click="clearProfileAvatar">
+              恢复默认
+            </el-button>
+          </div>
+        </div>
+      </div>
+
+      <input
+        ref="profileAvatarInputRef"
+        class="hidden"
+        type="file"
+        accept="image/*"
+        @change="handleProfileAvatarChange"
+      >
+    </div>
+
+    <div class="dialog-section">
+      <p class="dialog-section__title">名称</p>
+      <el-input
+        v-model="profileForm.name"
+        placeholder="请输入名称"
+        class="dialog-input"
+        clearable
+      />
+    </div>
+
+    <div class="dialog-section">
+      <p class="dialog-section__title">账号 ID</p>
+      <el-input :model-value="currentUser.account" class="dialog-input" disabled />
+    </div>
+
+    <div class="dialog-section">
+      <p class="dialog-section__title">个性签名</p>
+      <el-input
+        v-model="profileForm.signature"
+        type="textarea"
+        resize="none"
+        :autosize="{ minRows: 3, maxRows: 5 }"
+        placeholder="写一句简单介绍自己吧"
+        class="dialog-input"
+      />
+    </div>
+
+    <template #footer>
+      <div class="dialog-footer">
+        <el-button @click="profileDialogVisible = false">取消</el-button>
+        <el-button type="primary" :disabled="!profileForm.name.trim()" @click="submitProfile">
+          保存
+        </el-button>
+      </div>
+    </template>
+  </el-dialog>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
+import { ElMessage } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
-import type { Conversation } from '@/views/ChatPage.vue'
+import UserAvatar from '@/components/ui/UserAvatar.vue'
+import type { Conversation, UserProfile } from '@/views/ChatPage.vue'
 
 interface GroupAvatarOption {
   label: string
@@ -296,6 +390,7 @@ interface GroupAvatarOption {
 
 const props = defineProps<{
   conversations: Conversation[]
+  currentUser: UserProfile
   selectedId: number
 }>()
 
@@ -309,6 +404,7 @@ const emit = defineEmits<{
     memberIds: number[]
   }]
   joinGroup: [groupCode: string]
+  updateCurrentUser: [payload: { name: string, signature: string, avatarImageUrl?: string }]
 }>()
 
 const tabs = [
@@ -335,12 +431,23 @@ const isDarkPage = ref(document.body.classList.contains('dark-page'))
 
 const contactDialogVisible = ref(false)
 const groupDialogVisible = ref(false)
+const profileDialogVisible = ref(false)
 const contactAccount = ref('')
 const groupAction = ref<'create' | 'join'>('create')
 const groupName = ref('')
 const groupCode = ref('')
 const selectedMemberIds = ref<number[]>([])
 const selectedAvatar = ref<GroupAvatarOption>(groupAvatarOptions[0])
+const profileAvatarInputRef = ref<HTMLInputElement>()
+const profileForm = reactive({
+  name: '',
+  signature: '',
+  avatarImageUrl: undefined as string | undefined,
+})
+
+const profileAvatarLabel = computed(() =>
+  profileForm.name.trim().slice(0, 1).toUpperCase() || props.currentUser.avatar,
+)
 
 const changeBackGround = () => {
   document.body.classList.toggle('dark-page')
@@ -444,6 +551,55 @@ const openCreateDialog = () => {
   }
 }
 
+const openProfileDialog = () => {
+  profileForm.name = props.currentUser.name
+  profileForm.signature = props.currentUser.signature
+  profileForm.avatarImageUrl = props.currentUser.avatarImageUrl
+  profileDialogVisible.value = true
+}
+
+const openProfileAvatarPicker = () => {
+  profileAvatarInputRef.value?.click()
+}
+
+const readFileAsDataUrl = (file: File) =>
+  new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result))
+    reader.onerror = () => reject(reader.error)
+    reader.readAsDataURL(file)
+  })
+
+const handleProfileAvatarChange = async (event: Event) => {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+
+  if (!file) {
+    input.value = ''
+    return
+  }
+
+  if (!file.type.startsWith('image/')) {
+    ElMessage.warning('请选择图片文件')
+    input.value = ''
+    return
+  }
+
+  try {
+    profileForm.avatarImageUrl = await readFileAsDataUrl(file)
+  }
+  catch {
+    ElMessage.error('头像读取失败，请重试')
+  }
+  finally {
+    input.value = ''
+  }
+}
+
+const clearProfileAvatar = () => {
+  profileForm.avatarImageUrl = undefined
+}
+
 const isSelectedMember = (conversation: Conversation) =>
   typeof conversation.peerUserId === 'number' && selectedMemberIds.value.includes(conversation.peerUserId)
 
@@ -485,6 +641,21 @@ const submitGroupAction = () => {
 
   groupDialogVisible.value = false
   resetGroupDialog()
+}
+
+const submitProfile = () => {
+  const name = profileForm.name.trim()
+
+  if (!name)
+    return
+
+  emit('updateCurrentUser', {
+    name,
+    signature: profileForm.signature.trim(),
+    avatarImageUrl: profileForm.avatarImageUrl,
+  })
+
+  profileDialogVisible.value = false
 }
 </script>
 
@@ -568,6 +739,75 @@ const submitGroupAction = () => {
 .sidebar-icon-btn:hover {
   background: var(--icon-hover-bg);
   color: var(--text-primary);
+}
+
+.profile-card {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 8px;
+  border-radius: 18px;
+  padding: 6px 4px;
+  transition: background-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.profile-card:hover {
+  background: var(--conversation-hover-bg);
+  box-shadow: var(--conversation-active-shadow);
+}
+
+.profile-card__avatar {
+  display: flex;
+  height: 40px;
+  width: 40px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  color: #fff;
+  font-size: 13px;
+}
+
+.profile-card__meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 300;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.profile-card__status {
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--text-faint);
+}
+
+.profile-card__status--online {
+  background: var(--online-color);
+}
+
+.profile-avatar-editor {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.profile-avatar-editor__preview {
+  box-shadow: 0 12px 28px rgba(61, 79, 70, 0.14);
+}
+
+.profile-avatar-editor__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
 }
 
 .search-input :deep(.el-input__wrapper) {

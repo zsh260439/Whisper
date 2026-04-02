@@ -21,9 +21,9 @@
               </template>
 
               <template v-else>
-                <p class="mt-1 flex items-center gap-1 text-xs font-light" :class="conversation.online ? 'text-[#49c893]' : 'text-ink-faint'">
-                  <span class="h-1.5 w-1.5 rounded-full" :class="conversation.online ? 'bg-[#49c893]' : 'bg-ink-faint'" />
-                  {{ conversation.online ? '在线' : '离线' }}
+                <p class="mt-1 flex items-center gap-1 text-xs font-light" :class="directConversationOnline ? 'text-[#49c893]' : 'text-ink-faint'">
+                  <span class="h-1.5 w-1.5 rounded-full" :class="directConversationOnline ? 'bg-[#49c893]' : 'bg-ink-faint'" />
+                  {{ directConversationOnline ? '在线' : '离线' }}
                 </p>
               </template>
             </div>
@@ -39,7 +39,13 @@
             <button class="window-icon-btn" type="button" aria-label="搜索消息">
               <i class="i-carbon-search text-lg" />
             </button>
-            <button class="window-icon-btn" type="button" aria-label="更多操作">
+            <button
+              class="window-icon-btn"
+              :class="detailsVisible ? 'window-icon-btn--active' : ''"
+              type="button"
+              :aria-label="detailsVisible ? '收起详情' : '打开详情'"
+              @click="toggleDetailsPanel"
+            >
               <i class="i-carbon-overflow-menu-vertical text-lg" />
             </button>
           </div>
@@ -68,12 +74,28 @@
                   {{ conversation.avatar }}
                 </div>
 
-                <div class="max-w-[150px] sm:max-w-[186px] lg:max-w-[214px]">
+                <div :class="message.type === 'image' ? 'max-w-[240px] sm:max-w-[300px] lg:max-w-[360px]' : 'max-w-[150px] sm:max-w-[186px] lg:max-w-[214px]'">
                   <div
                     class="message-bubble"
-                    :class="message.isMine ? 'message-bubble--mine' : 'message-bubble--other'"
+                    :class="[
+                      message.isMine ? 'message-bubble--mine' : 'message-bubble--other',
+                      message.type === 'image' ? 'message-bubble--media' : '',
+                    ]"
                   >
-                    <p class="text-[13px] leading-[1.55]">
+                    <template v-if="message.type === 'image' && message.imageUrl">
+                      <a :href="message.imageUrl" target="_blank" rel="noreferrer" class="message-image-link">
+                        <img
+                          :src="message.imageUrl"
+                          :alt="message.content || '聊天图片'"
+                          class="message-image"
+                        >
+                      </a>
+                      <p v-if="getMediaCaption(message)" class="message-caption">
+                        {{ getMediaCaption(message) }}
+                      </p>
+                    </template>
+
+                    <p v-else class="text-[13px] leading-[1.55] whitespace-pre-wrap break-words">
                       {{ message.content }}
                     </p>
 
@@ -86,10 +108,15 @@
 
                 <div
                   v-if="message.isMine"
-                  class="mb-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs text-white"
-                  style="background-color: #C4A882;"
+                  class="mb-1 shrink-0"
                 >
-                  我
+                  <UserAvatar
+                    :label="currentUserProfile.avatar"
+                    :color="currentUserProfile.avatarColor"
+                    :image-url="currentUserProfile.avatarImageUrl"
+                    :size="32"
+                    alt="我的头像"
+                  />
                 </div>
               </div>
             </div>
@@ -98,22 +125,53 @@
 
         <div class="chat-composer">
           <div class="px-8 pt-3">
-            <div class="mx-auto flex max-w-[920px] items-center gap-1">
-              <button class="window-icon-btn window-icon-btn--sm" type="button" aria-label="表情">
-                <i class="i-carbon-face-satisfied text-lg" />
-              </button>
-              <button class="window-icon-btn window-icon-btn--sm" type="button" aria-label="图片">
-                <i class="i-carbon-image text-lg" />
-              </button>
-              <button class="window-icon-btn window-icon-btn--sm" type="button" aria-label="文件">
-                <i class="i-carbon-document text-lg" />
-              </button>
-              <button class="window-icon-btn window-icon-btn--sm" type="button" aria-label="截图">
-                <i class="i-carbon-crop text-lg" />
-              </button>
-              <button class="window-icon-btn window-icon-btn--sm" type="button" aria-label="语音">
-                <i class="i-carbon-microphone text-lg" />
-              </button>
+            <div ref="composerToolsRef" class="relative mx-auto max-w-[920px]">
+              <div class="flex items-center gap-1">
+                <button class="window-icon-btn window-icon-btn--sm" type="button" aria-label="表情" @click="toggleEmojiPicker">
+                  <i class="i-carbon-face-satisfied text-lg" />
+                </button>
+                <button class="window-icon-btn window-icon-btn--sm" type="button" aria-label="图片" @click="openImagePicker">
+                  <i class="i-carbon-image text-lg" />
+                </button>
+                <button class="window-icon-btn window-icon-btn--sm" type="button" aria-label="截图" @click="captureScreenshot">
+                  <i class="i-carbon-crop text-lg" />
+                </button>
+              </div>
+
+              <div v-if="emojiPickerVisible" class="emoji-panel">
+                <div class="emoji-panel__header">
+                  <button
+                    v-for="group in emojiLibrary"
+                    :key="group.key"
+                    class="emoji-panel__group"
+                    :class="activeEmojiGroup === group.key ? 'emoji-panel__group--active' : ''"
+                    type="button"
+                    @click="activeEmojiGroup = group.key"
+                  >
+                    {{ group.label }}
+                  </button>
+                </div>
+
+                <div class="emoji-panel__grid">
+                  <button
+                    v-for="emoji in activeEmojiList"
+                    :key="emoji"
+                    class="emoji-panel__item"
+                    type="button"
+                    @click="handleEmojiSelect(emoji)"
+                  >
+                    {{ emoji }}
+                  </button>
+                </div>
+              </div>
+
+              <input
+                ref="imageInputRef"
+                class="hidden"
+                type="file"
+                accept="image/*"
+                @change="handleImageInputChange"
+              >
             </div>
           </div>
 
@@ -149,162 +207,20 @@
         </div>
       </section>
 
-      <aside v-if="conversation.isGroup" class="group-side">
-        <div class="group-side__panel">
-          <div class="group-side__summary">
-            <div class="group-side__summary-main">
-              <div
-                class="group-side__summary-avatar"
-                :style="{ backgroundColor: conversation.avatarColor }"
-              >
-                {{ conversation.avatar }}
-              </div>
-
-              <div class="min-w-0 flex-1">
-                <div class="group-side__summary-top">
-                  <h3 class="truncate text-[15px] font-medium tracking-wide text-ink">{{ conversation.name }}</h3>
-                  <span class="group-side__summary-count">{{ groupMemberCount }}</span>
-                </div>
-                <p class="mt-1 truncate text-[12px] text-ink-faint">群号 {{ groupIdText }}</p>
-
-                <div class="group-side__summary-tags">
-                  <span class="group-side__summary-tag">群成员 {{ groupMemberCount }}</span>
-                  <span class="group-side__summary-tag">全部可见</span>
-                </div>
-              </div>
-
-              <button class="group-side__toggle" type="button" @click="inviteExpanded = !inviteExpanded">
-                <i :class="inviteExpanded ? 'i-carbon-chevron-up' : 'i-carbon-add'" />
-              </button>
-            </div>
-
-            <div class="group-side__preview">
-              <div class="group-side__preview-avatars">
-                <div
-                  v-for="member in previewMembers"
-                  :key="`preview-${member.id}`"
-                  class="group-side__preview-avatar"
-                  :style="{ backgroundColor: member.avatarColor }"
-                >
-                  {{ member.avatar }}
-                </div>
-              </div>
-              <p class="truncate text-[11px] text-ink-faint">点击右侧成员可加好友，群成员都能邀请新人进群</p>
-            </div>
-          </div>
-
-          <label class="group-side__search">
-            <i class="i-carbon-search text-sm text-ink-faint" />
-            <input
-              v-model="memberKeyword"
-              class="group-side__search-input"
-              type="text"
-              placeholder="搜索群成员"
-            >
-          </label>
-
-          <div v-if="inviteExpanded" class="group-side__invite-panel">
-            <div class="group-side__section-head">
-              <div>
-                <p class="group-side__section-title">邀请成员</p>
-                <p class="group-side__section-desc">选择后直接加入当前群聊</p>
-              </div>
-              <span class="group-side__section-meta">已选 {{ selectedInviteIds.length }}</span>
-            </div>
-
-            <div v-if="filteredInviteCandidates.length" class="group-side__invite-list">
-              <button
-                v-for="candidate in filteredInviteCandidates"
-                :key="candidate.id"
-                class="group-side__invite-item"
-                :class="selectedInviteIds.includes(candidate.id) ? 'group-side__invite-item--active' : ''"
-                type="button"
-                @click="toggleInvite(candidate.id)"
-              >
-                <div class="group-side__avatar-wrap">
-                  <div class="group-side__avatar" :style="{ backgroundColor: candidate.avatarColor }">
-                    {{ candidate.avatar }}
-                  </div>
-                  <span class="group-side__presence" :class="candidate.online ? 'group-side__presence--online' : ''" />
-                </div>
-
-                <div class="min-w-0 flex-1 text-left">
-                  <p class="truncate text-[13px] text-ink">{{ candidate.name }}</p>
-                  <p class="truncate text-[11px] text-ink-faint">@{{ candidate.account }}</p>
-                </div>
-
-                <span class="group-side__state">{{ isFriend(candidate.id) ? '好友' : '可邀' }}</span>
-              </button>
-            </div>
-
-            <div v-else class="group-side__empty">
-              没有可邀请的成员
-            </div>
-
-            <div v-if="selectedInviteMembers.length" class="group-side__selected">
-              <span
-                v-for="member in selectedInviteMembers"
-                :key="`selected-${member.id}`"
-                class="group-side__selected-chip"
-              >
-                {{ member.name }}
-              </span>
-            </div>
-
-            <button
-              class="group-side__invite-submit"
-              :class="canInviteMembers ? 'group-side__invite-submit--active' : 'group-side__invite-submit--disabled'"
-              :disabled="!canInviteMembers"
-              type="button"
-              @click="submitInviteMembers"
-            >
-              邀请加入
-            </button>
-          </div>
-
-          <div class="group-side__member-header">
-            <span class="group-side__section-title">群成员</span>
-            <span class="group-side__section-meta">{{ filteredGroupMembers.length }} 位</span>
-          </div>
-
-          <div class="group-side__member-list">
-          <div
-            v-for="member in filteredGroupMembers"
-            :key="member.id"
-            class="group-side__member-item"
-          >
-            <div class="group-side__avatar-wrap">
-              <div class="group-side__avatar" :style="{ backgroundColor: member.avatarColor }">
-                {{ member.avatar }}
-              </div>
-              <span class="group-side__presence" :class="member.online ? 'group-side__presence--online' : ''" />
-            </div>
-
-            <div class="min-w-0 flex-1">
-              <p class="truncate text-[13px] text-ink">{{ member.name }}</p>
-              <p class="truncate text-[11px] text-ink-faint">@{{ member.account }}</p>
-            </div>
-
-            <div class="group-side__member-action">
-              <span v-if="member.id === currentUserId" class="group-side__tag">我</span>
-              <span v-else-if="isFriend(member.id)" class="group-side__tag group-side__tag--friend">好友</span>
-              <button
-                v-else
-                class="group-side__friend-btn"
-                type="button"
-                @click="emit('addFriend', member.id)"
-              >
-                加好友
-              </button>
-            </div>
-          </div>
-
-          <div v-if="!filteredGroupMembers.length" class="group-side__empty">
-            没找到相关成员
-          </div>
-        </div>
-        </div>
-      </aside>
+      <transition name="detail-panel">
+        <ConversationDetailsPanel
+          v-if="detailsVisible"
+          :conversation="conversation"
+          :current-user-id="currentUserId"
+          :friend-user-ids="friendUserIds"
+          :group-members="groupMembers"
+          :group-invite-candidates="groupInviteCandidates"
+          :peer-profile="peerProfile"
+          @add-friend="emit('addFriend', $event)"
+          @invite-group-members="emit('inviteGroupMembers', $event)"
+          @close="detailsVisible = false"
+        />
+      </transition>
     </template>
 
     <div v-else class="flex flex-1 items-center justify-center">
@@ -320,12 +236,17 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
-import type { Conversation, UserProfile } from '@/views/ChatPage.vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { ElMessage } from 'element-plus'
+import ConversationDetailsPanel from '@/components/ConversationDetailsPanel.vue'
+import UserAvatar from '@/components/ui/UserAvatar.vue'
+import type { Conversation, Message, UserProfile } from '@/views/ChatPage.vue'
 
 const props = defineProps<{
   conversation?: Conversation
   currentUserId: number
+  currentUserProfile: UserProfile
+  peerProfile?: UserProfile
   friendUserIds: number[]
   groupMembers: UserProfile[]
   groupInviteCandidates: UserProfile[]
@@ -336,11 +257,52 @@ const emit = defineEmits<{
   inviteGroupMembers: [payload: { conversationId: number, memberIds: number[] }]
 }>()
 
+interface EmojiGroup {
+  key: string
+  label: string
+  emojis: string[]
+}
+
+const emojiLibrary: EmojiGroup[] = [
+  { key: 'smile', label: '笑脸', emojis: ['😀', '😁', '😂', '🤣', '😊', '😍', '🥰', '😎', '🥳', '🤩', '😇', '🙂'] },
+  { key: 'mood', label: '氛围', emojis: ['😌', '😴', '🤔', '🥺', '😭', '😤', '😮', '😳', '🙃', '🤗', '😏', '😶‍🌫️'] },
+  { key: 'hand', label: '手势', emojis: ['👍', '👎', '👏', '🙌', '🤝', '🙏', '✌️', '🤟', '👌', '👀', '💪', '✍️'] },
+  { key: 'fun', label: '趣味', emojis: ['🎉', '🎈', '🔥', '✨', '🌈', '☕', '🍉', '🌙', '🌻', '💯', '❤️', '🎵'] },
+]
+
 const messageText = ref('')
-const memberKeyword = ref('')
-const inviteExpanded = ref(false)
-const selectedInviteIds = ref<number[]>([])
+const detailsVisible = ref(false)
+const emojiPickerVisible = ref(false)
+const activeEmojiGroup = ref(emojiLibrary[0].key)
 const messagesContainer = ref<HTMLDivElement>()
+const composerToolsRef = ref<HTMLDivElement>()
+const imageInputRef = ref<HTMLInputElement>()
+
+const activeEmojiList = computed(() =>
+  emojiLibrary.find(group => group.key === activeEmojiGroup.value)?.emojis ?? emojiLibrary[0].emojis,
+)
+
+const groupIdText = computed(() =>
+  props.conversation?.groupMeta?.groupId ?? '未生成',
+)
+
+const groupMemberCount = computed(() =>
+  props.conversation?.groupMeta?.memberIds.length ?? props.conversation?.groupMeta?.memberCount ?? 1,
+)
+
+const directConversationOnline = computed(() =>
+  props.peerProfile?.online ?? props.conversation?.online ?? false,
+)
+
+const headerTitle = computed(() => {
+  if (!props.conversation)
+    return ''
+
+  if (props.conversation.isGroup)
+    return `${props.conversation.name} (${groupMemberCount.value})`
+
+  return props.peerProfile?.name ?? props.conversation.name
+})
 
 const scrollToBottom = async (behavior: ScrollBehavior = 'auto') => {
   await nextTick()
@@ -354,83 +316,203 @@ const scrollToBottom = async (behavior: ScrollBehavior = 'auto') => {
   })
 }
 
-const groupIdText = computed(() =>
-  props.conversation?.groupMeta?.groupId ?? '未生成',
-)
+const formatTime = () =>
+  new Date().toLocaleTimeString('zh-CN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
 
-const groupMemberCount = computed(() =>
-  props.conversation?.groupMeta?.memberIds.length ?? props.conversation?.groupMeta?.memberCount ?? 1,
-)
+const getConversationPreview = (message: Message) => {
+  if (message.type === 'image')
+    return message.content === '截图' ? '[截图]' : '[图片]'
 
-const headerTitle = computed(() => {
+  return message.content
+}
+
+const appendOutgoingMessage = async (message: Message) => {
   if (!props.conversation)
+    return
+
+  props.conversation.messages.push(message)
+  props.conversation.lastMessage = getConversationPreview(message)
+  props.conversation.lastTime = message.time
+  props.conversation.unread = 0
+
+  await scrollToBottom('smooth')
+}
+
+const sendTextPayload = async (content: string) => {
+  const trimmed = content.trim()
+
+  if (!trimmed || !props.conversation)
+    return
+
+  await appendOutgoingMessage({
+    id: Date.now() + Math.floor(Math.random() * 1000),
+    senderId: props.currentUserId,
+    senderName: props.currentUserProfile.name,
+    content: trimmed,
+    time: formatTime(),
+    isMine: true,
+    type: 'text',
+  })
+}
+
+const getMediaCaption = (message: Message) => {
+  if (message.type !== 'image')
     return ''
 
-  if (props.conversation.isGroup)
-    return `${props.conversation.name} (${groupMemberCount.value})`
+  return message.content === '截图' ? '' : message.content
+}
 
-  return props.conversation.name
-})
+const toggleDetailsPanel = () => {
+  if (!props.conversation)
+    return
 
-const normalizedKeyword = computed(() =>
-  memberKeyword.value.trim().toLowerCase(),
-)
+  detailsVisible.value = !detailsVisible.value
+}
 
-const filteredGroupMembers = computed(() => {
-  if (!normalizedKeyword.value)
-    return props.groupMembers
+const toggleEmojiPicker = () => {
+  emojiPickerVisible.value = !emojiPickerVisible.value
+}
 
-  return props.groupMembers.filter(member =>
-    member.name.toLowerCase().includes(normalizedKeyword.value)
-    || member.account.toLowerCase().includes(normalizedKeyword.value),
-  )
-})
+const handleEmojiSelect = async (emoji: string) => {
+  messageText.value += emoji
+  emojiPickerVisible.value = false
+}
 
-const filteredInviteCandidates = computed(() => {
-  if (!normalizedKeyword.value)
-    return props.groupInviteCandidates
+const openImagePicker = () => {
+  emojiPickerVisible.value = false
+  imageInputRef.value?.click()
+}
 
-  return props.groupInviteCandidates.filter(member =>
-    member.name.toLowerCase().includes(normalizedKeyword.value)
-    || member.account.toLowerCase().includes(normalizedKeyword.value),
-  )
-})
+const readFileAsDataUrl = (file: File) =>
+  new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result))
+    reader.onerror = () => reject(reader.error)
+    reader.readAsDataURL(file)
+  })
 
-const selectedInviteMembers = computed(() =>
-  props.groupInviteCandidates.filter(candidate => selectedInviteIds.value.includes(candidate.id)),
-)
+const sendImageMessage = async (options: { imageUrl: string, content: string }) => {
+  if (!props.conversation)
+    return
 
-const previewMembers = computed(() =>
-  props.groupMembers.slice(0, 5),
-)
+  await appendOutgoingMessage({
+    id: Date.now() + Math.floor(Math.random() * 1000),
+    senderId: props.currentUserId,
+    senderName: props.currentUserProfile.name,
+    content: options.content,
+    time: formatTime(),
+    isMine: true,
+    type: 'image',
+    imageUrl: options.imageUrl,
+  })
+}
 
-const canInviteMembers = computed(() =>
-  Boolean(props.conversation?.isGroup && selectedInviteIds.value.length > 0),
-)
+const handleImageInputChange = async (event: Event) => {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
 
-const isFriend = (userId: number) =>
-  props.friendUserIds.includes(userId)
-
-const toggleInvite = (userId: number) => {
-  if (selectedInviteIds.value.includes(userId)) {
-    selectedInviteIds.value = selectedInviteIds.value.filter(inviteId => inviteId !== userId)
+  if (!file) {
+    input.value = ''
     return
   }
 
-  selectedInviteIds.value = [...selectedInviteIds.value, userId]
+  if (!file.type.startsWith('image/')) {
+    ElMessage.warning('请选择图片文件')
+    input.value = ''
+    return
+  }
+
+  try {
+    const imageUrl = await readFileAsDataUrl(file)
+    await sendImageMessage({
+      imageUrl,
+      content: file.name,
+    })
+  }
+  catch {
+    ElMessage.error('图片读取失败，请重试')
+  }
+  finally {
+    input.value = ''
+  }
 }
 
-const submitInviteMembers = () => {
-  if (!props.conversation?.isGroup || !selectedInviteIds.value.length)
+const getScreenshotUnavailableMessage = () => {
+  if (!window.isSecureContext)
+    return '当前页面不是安全上下文，浏览器不会开放系统截图。请用 Chrome 或 Edge 打开本地地址。'
+
+  return '当前运行环境没有开放系统截图能力，请在 Chrome 或 Edge 浏览器窗口中使用，或先截图后通过图片发送。'
+}
+
+const captureScreenshot = async () => {
+  emojiPickerVisible.value = false
+
+  if (!navigator.mediaDevices?.getDisplayMedia) {
+    ElMessage.warning(getScreenshotUnavailableMessage())
+    return
+  }
+
+  let stream: MediaStream | undefined
+
+  try {
+    stream = await navigator.mediaDevices.getDisplayMedia({
+      video: true,
+      audio: false,
+    })
+
+    const video = document.createElement('video')
+    video.srcObject = stream
+    video.muted = true
+    video.playsInline = true
+
+    await video.play()
+    await new Promise(resolve => setTimeout(resolve, 180))
+
+    const sourceWidth = video.videoWidth || 1920
+    const sourceHeight = video.videoHeight || 1080
+    const maxWidth = 1440
+    const scale = Math.min(1, maxWidth / sourceWidth)
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.max(1, Math.round(sourceWidth * scale))
+    canvas.height = Math.max(1, Math.round(sourceHeight * scale))
+
+    const context = canvas.getContext('2d')
+    if (!context)
+      throw new Error('no-canvas-context')
+
+    context.drawImage(video, 0, 0, canvas.width, canvas.height)
+
+    await sendImageMessage({
+      imageUrl: canvas.toDataURL('image/jpeg', 0.92),
+      content: '截图',
+    })
+  }
+  catch (error) {
+    if (error instanceof DOMException && error.name === 'NotAllowedError')
+      ElMessage.info('你已取消截图')
+    else if (error instanceof DOMException && error.name === 'SecurityError')
+      ElMessage.warning(getScreenshotUnavailableMessage())
+    else
+      ElMessage.error('截图失败，请重试')
+  }
+  finally {
+    stream?.getTracks().forEach(track => track.stop())
+  }
+}
+
+const handleDocumentPointerDown = (event: MouseEvent) => {
+  if (!emojiPickerVisible.value || !composerToolsRef.value)
     return
 
-  emit('inviteGroupMembers', {
-    conversationId: props.conversation.id,
-    memberIds: [...selectedInviteIds.value],
-  })
+  const target = event.target as Node | null
+  if (target && composerToolsRef.value.contains(target))
+    return
 
-  selectedInviteIds.value = []
-  inviteExpanded.value = false
+  emojiPickerVisible.value = false
 }
 
 watch(
@@ -444,40 +526,27 @@ watch(
 watch(
   () => props.conversation?.id,
   () => {
-    memberKeyword.value = ''
-    inviteExpanded.value = false
-    selectedInviteIds.value = []
+    detailsVisible.value = false
+    emojiPickerVisible.value = false
   },
 )
 
 const sendMessage = async () => {
   const content = messageText.value.trim()
-
-  if (!content || !props.conversation)
+  if (!content)
     return
 
-  const time = new Date().toLocaleTimeString('zh-CN', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  })
-
-  props.conversation.messages.push({
-    id: Date.now(),
-    senderId: 0,
-    senderName: '我',
-    content,
-    time,
-    isMine: true,
-  })
-
-  props.conversation.lastMessage = content
-  props.conversation.lastTime = time
-  props.conversation.unread = 0
-
+  await sendTextPayload(content)
   messageText.value = ''
-  await scrollToBottom()
 }
+
+onMounted(() => {
+  document.addEventListener('mousedown', handleDocumentPointerDown)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('mousedown', handleDocumentPointerDown)
+})
 </script>
 
 <style scoped>
@@ -528,6 +597,12 @@ const sendMessage = async () => {
   color: var(--text-primary);
 }
 
+.window-icon-btn--active {
+  background: var(--conversation-active-bg);
+  color: var(--text-primary);
+  box-shadow: var(--conversation-active-shadow);
+}
+
 .window-icon-btn--sm {
   height: 34px;
   width: 34px;
@@ -560,6 +635,33 @@ const sendMessage = async () => {
   color: var(--bubble-other-text);
 }
 
+.message-bubble--media {
+  padding: 8px;
+  overflow: hidden;
+}
+
+.message-image-link {
+  display: block;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.message-image {
+  display: block;
+  width: 100%;
+  max-height: 320px;
+  object-fit: cover;
+  background: rgba(255, 255, 255, 0.42);
+}
+
+.message-caption {
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-soft);
+  word-break: break-word;
+}
+
 .message-meta--mine {
   color: var(--bubble-mine-meta);
 }
@@ -572,6 +674,81 @@ const sendMessage = async () => {
   background: var(--date-pill-bg);
   color: var(--date-pill-text);
   transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+.emoji-panel {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 12px);
+  z-index: 20;
+  width: min(320px, calc(100vw - 64px));
+  padding: 14px;
+  border: 1px solid rgba(61, 79, 70, 0.08);
+  border-radius: 22px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 245, 240, 0.96));
+  box-shadow: 0 20px 40px rgba(26, 32, 28, 0.1);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.emoji-panel__header {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.emoji-panel__header::-webkit-scrollbar {
+  display: none;
+}
+
+.emoji-panel__group {
+  flex: 0 0 auto;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: rgba(61, 79, 70, 0.06);
+  color: var(--text-muted);
+  font-size: 12px;
+  transition: all 0.22s ease;
+}
+
+.emoji-panel__group:hover {
+  background: rgba(61, 79, 70, 0.1);
+  color: var(--text-primary);
+}
+
+.emoji-panel__group--active {
+  border-color: rgba(61, 79, 70, 0.12);
+  background: rgba(61, 79, 70, 0.14);
+  color: var(--text-primary);
+  box-shadow: 0 8px 18px rgba(25, 32, 28, 0.08);
+}
+
+.emoji-panel__grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.emoji-panel__item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.72);
+  font-size: 22px;
+  transition: transform 0.18s ease, background-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.emoji-panel__item:hover {
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 10px 20px rgba(25, 32, 28, 0.08);
+  transform: translateY(-1px);
 }
 
 .message-input :deep(.el-textarea__inner) {
@@ -626,412 +803,15 @@ const sendMessage = async () => {
   background: var(--send-enabled-hover);
 }
 
-.group-side {
-  display: flex;
-  width: 312px;
-  flex-shrink: 0;
-  flex-direction: column;
-  border-left: 1px solid var(--divider-color);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.72) 0%, rgba(251, 250, 248, 0.94) 100%);
+.detail-panel-enter-active,
+.detail-panel-leave-active {
+  transition: opacity 0.24s ease, transform 0.24s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.group-side__panel {
-  display: flex;
-  min-height: 0;
-  flex: 1;
-  flex-direction: column;
-  padding: 14px 14px 12px;
-}
-
-.group-side__summary {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  padding: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.5);
-  border-radius: 22px;
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(244, 240, 233, 0.94));
-  box-shadow: 0 18px 36px rgba(29, 36, 33, 0.07);
-}
-
-.group-side__summary-main {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.group-side__summary-avatar {
-  display: flex;
-  height: 48px;
-  width: 48px;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  border-radius: 16px;
-  color: #fff;
-  font-size: 18px;
-  letter-spacing: 0.06em;
-  box-shadow: 0 10px 22px rgba(61, 79, 70, 0.18);
-}
-
-.group-side__summary-top {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.group-side__summary-count {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 28px;
-  height: 22px;
-  padding: 0 8px;
-  border-radius: 999px;
-  background: rgba(61, 79, 70, 0.1);
-  color: var(--brand-bg);
-  font-size: 11px;
-  font-weight: 500;
-}
-
-.group-side__summary-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 10px;
-}
-
-.group-side__summary-tag {
-  display: inline-flex;
-  align-items: center;
-  height: 24px;
-  padding: 0 10px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.86);
-  color: var(--text-soft);
-  font-size: 11px;
-}
-
-.group-side__toggle {
-  display: inline-flex;
-  height: 34px;
-  width: 34px;
-  align-items: center;
-  justify-content: center;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.82);
-  color: var(--text-muted);
-  transition: all 0.25s ease;
-}
-
-.group-side__toggle:hover {
-  background: var(--conversation-active-bg);
-  color: var(--text-primary);
-  box-shadow: var(--conversation-active-shadow);
-}
-
-.group-side__preview {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.group-side__preview-avatars {
-  display: flex;
-  align-items: center;
-}
-
-.group-side__preview-avatar {
-  display: flex;
-  height: 28px;
-  width: 28px;
-  align-items: center;
-  justify-content: center;
-  margin-left: -6px;
-  border: 2px solid rgba(255, 255, 255, 0.9);
-  border-radius: 999px;
-  color: #fff;
-  font-size: 11px;
-  box-shadow: 0 8px 18px rgba(25, 32, 28, 0.08);
-}
-
-.group-side__preview-avatar:first-child {
-  margin-left: 0;
-}
-
-.group-side__search {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 14px;
-  padding: 0 12px;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.82);
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.04);
-  transition: box-shadow 0.25s ease, background-color 0.25s ease;
-}
-
-.group-side__search:focus-within {
-  background: var(--input-focus-bg);
-  box-shadow: 0 0 0 1px var(--input-focus-border);
-}
-
-.group-side__search-input {
-  height: 36px;
-  width: 100%;
-  border: none;
-  background: transparent;
-  color: var(--text-primary);
-  font-size: 12px;
-  outline: none;
-}
-
-.group-side__search-input::placeholder {
-  color: var(--text-faint);
-}
-
-.group-side__invite-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-top: 14px;
-  padding: 12px;
-  border: 1px solid rgba(61, 79, 70, 0.08);
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.76);
-  box-shadow: 0 10px 24px rgba(25, 32, 28, 0.04);
-}
-
-.group-side__section-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.group-side__section-title {
-  margin: 0;
-  color: var(--text-primary);
-  font-size: 13px;
-  font-weight: 500;
-}
-
-.group-side__section-desc {
-  margin: 4px 0 0;
-  color: var(--text-faint);
-  font-size: 11px;
-}
-
-.group-side__section-meta {
-  color: var(--text-faint);
-  font-size: 11px;
-}
-
-.group-side__invite-list {
-  display: flex;
-  max-height: 180px;
-  flex-direction: column;
-  gap: 8px;
-  overflow-y: auto;
-  padding-right: 2px;
-}
-
-.group-side__invite-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 50px;
-  padding: 8px 10px;
-  border: 1px solid rgba(0, 0, 0, 0.03);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.84);
-  transition: all 0.25s ease;
-}
-
-.group-side__invite-item--active {
-  border-color: rgba(61, 79, 70, 0.16);
-  background: var(--conversation-active-bg);
-  box-shadow: var(--conversation-active-shadow);
-}
-
-.group-side__member-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 14px;
-  padding: 0 2px;
-}
-
-.group-side__member-list {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: 8px;
-  overflow-y: auto;
-  min-height: 0;
-  margin-top: 10px;
-  padding: 0 2px 4px;
-}
-
-.group-side__member-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 52px;
-  padding: 8px 10px;
-  border: 1px solid rgba(0, 0, 0, 0.03);
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.72);
-  transition: background-color 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
-}
-
-.group-side__member-item:hover {
-  border-color: rgba(61, 79, 70, 0.1);
-  background: rgba(255, 255, 255, 0.9);
-  box-shadow: var(--conversation-active-shadow);
-}
-
-.group-side__avatar-wrap {
-  position: relative;
-}
-
-.group-side__avatar {
-  display: flex;
-  height: 34px;
-  width: 34px;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  border-radius: 999px;
-  color: #fff;
-  font-size: 12px;
-  box-shadow: 0 8px 18px rgba(25, 32, 28, 0.08);
-}
-
-.group-side__presence {
-  position: absolute;
-  right: -1px;
-  bottom: -1px;
-  height: 10px;
-  width: 10px;
-  border: 2px solid rgba(255, 255, 255, 0.92);
-  border-radius: 999px;
-  background: var(--text-faint);
-}
-
-.group-side__presence--online {
-  background: var(--online-color);
-}
-
-.group-side__state {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 38px;
-  height: 22px;
-  padding: 0 8px;
-  border-radius: 999px;
-  background: rgba(61, 79, 70, 0.08);
-  color: var(--text-muted);
-  font-size: 11px;
-}
-
-.group-side__selected {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.group-side__selected-chip {
-  display: inline-flex;
-  align-items: center;
-  height: 24px;
-  padding: 0 10px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.86);
-  color: var(--text-primary);
-  font-size: 11px;
-}
-
-.group-side__invite-submit {
-  height: 34px;
-  border-radius: 12px;
-  font-size: 12px;
-  transition: all 0.25s ease;
-}
-
-.group-side__invite-submit--disabled {
-  background: var(--send-disabled-bg);
-  color: var(--send-disabled-text);
-  cursor: not-allowed;
-}
-
-.group-side__invite-submit--active {
-  background: var(--send-enabled-bg);
-  color: var(--bubble-mine-text);
-  box-shadow: var(--send-enabled-shadow);
-}
-
-.group-side__invite-submit--active:hover {
-  background: var(--send-enabled-hover);
-}
-
-.group-side__member-action {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-}
-
-.group-side__tag {
-  display: inline-flex;
-  align-items: center;
-  height: 24px;
-  padding: 0 10px;
-  border-radius: 999px;
-  background: rgba(61, 79, 70, 0.08);
-  color: var(--text-muted);
-  font-size: 11px;
-}
-
-.group-side__tag--friend {
-  color: var(--brand-bg);
-}
-
-.group-side__friend-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 28px;
-  padding: 0 12px;
-  border-radius: 999px;
-  background: rgba(61, 79, 70, 0.08);
-  color: var(--brand-bg);
-  font-size: 11px;
-  font-weight: 500;
-  transition: all 0.25s ease;
-}
-
-.group-side__friend-btn:hover {
-  background: rgba(61, 79, 70, 0.14);
-}
-
-.group-side__empty {
-  padding: 12px 10px;
-  border-radius: 12px;
-  color: var(--text-muted);
-  font-size: 12px;
-  line-height: 1.6;
-  background: rgba(0, 0, 0, 0.025);
-}
-
-@media (max-width: 1180px) {
-  .group-side {
-    width: 288px;
-  }
+.detail-panel-enter-from,
+.detail-panel-leave-to {
+  opacity: 0;
+  transform: translateX(18px);
 }
 
 @keyframes message-slide-up {

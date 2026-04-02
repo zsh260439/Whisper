@@ -2,15 +2,19 @@
   <div class="h-screen w-screen flex overflow-hidden bg-[#fcfbf9]">
     <ChatSidebar
       :conversations="conversations"
+      :current-user="currentUserProfile"
       :selected-id="selectedConversationId"
       @select="handleSelectConversation"
       @add-contact="handleAddContact"
       @create-group="handleCreateGroup"
       @join-group="handleJoinGroup"
+      @update-current-user="handleUpdateCurrentUser"
     />
     <ChatWindow
       :conversation="currentConversation"
       :current-user-id="CURRENT_USER_ID"
+      :current-user-profile="currentUserProfile"
+      :peer-profile="peerProfile"
       :friend-user-ids="friendUserIds"
       :group-members="groupMembers"
       :group-invite-candidates="groupInviteCandidates"
@@ -32,6 +36,8 @@ export interface Message {
   content: string
   time: string
   isMine: boolean
+  type?: 'text' | 'image'
+  imageUrl?: string
 }
 
 export interface UserProfile {
@@ -40,7 +46,9 @@ export interface UserProfile {
   account: string
   avatar: string
   avatarColor: string
+  avatarImageUrl?: string
   online: boolean
+  signature: string
 }
 
 export interface GroupMeta {
@@ -96,16 +104,16 @@ const getAvatarLabel = (name: string, isGroup: boolean) => {
 const createGroupId = () => String(Math.floor(100000 + Math.random() * 900000))
 
 const userProfiles = ref<UserProfile[]>([
-  { id: CURRENT_USER_ID, name: '我', account: 'me', avatar: '我', avatarColor: '#C4A882', online: true },
-  { id: 1, name: '林小溪', account: 'linxiaoxi', avatar: '林', avatarColor: '#91A896', online: true },
-  { id: 2, name: '张明', account: 'zhangming', avatar: '张', avatarColor: '#8097AA', online: true },
-  { id: 3, name: '王琳', account: 'wanglin', avatar: '王', avatarColor: '#CAA97F', online: true },
-  { id: 4, name: '陈思远', account: 'chensiyuan', avatar: '陈', avatarColor: '#D4A39B', online: true },
-  { id: 5, name: '李华', account: 'lihua', avatar: '李', avatarColor: '#8AA1B8', online: false },
-  { id: 6, name: '王佳宁', account: 'wangjianing', avatar: '王', avatarColor: '#8AA1B8', online: false },
-  { id: 7, name: '苏晓晴', account: 'suxiaoqing', avatar: '苏', avatarColor: '#C89289', online: false },
-  { id: 8, name: '周舟', account: 'zhouzhou', avatar: '周', avatarColor: '#7E9D8E', online: true },
-  { id: 9, name: '许诺', account: 'xunuo', avatar: '许', avatarColor: '#A68AC0', online: false },
+  { id: CURRENT_USER_ID, name: '我', account: 'me', avatar: '我', avatarColor: '#C4A882', online: true, signature: '在做一个更顺手的聊天项目。' },
+  { id: 1, name: '林小溪', account: 'linxiaoxi', avatar: '林', avatarColor: '#91A896', online: true, signature: '周末只想去有风的地方。' },
+  { id: 2, name: '张明', account: 'zhangming', avatar: '张', avatarColor: '#8097AA', online: true, signature: '想把每一个细节都落到体验里。' },
+  { id: 3, name: '王琳', account: 'wanglin', avatar: '王', avatarColor: '#CAA97F', online: true, signature: '今天也在认真做设计。' },
+  { id: 4, name: '陈思远', account: 'chensiyuan', avatar: '陈', avatarColor: '#D4A39B', online: true, signature: '先看问题，再谈方案。' },
+  { id: 5, name: '李华', account: 'lihua', avatar: '李', avatarColor: '#8AA1B8', online: false, signature: '最近沉迷阅读和记录。' },
+  { id: 6, name: '王佳宁', account: 'wangjianing', avatar: '王', avatarColor: '#8AA1B8', online: false, signature: '照片和色调都要刚刚好。' },
+  { id: 7, name: '苏晓晴', account: 'suxiaoqing', avatar: '苏', avatarColor: '#C89289', online: false, signature: '好久不见，也要慢慢变好。' },
+  { id: 8, name: '周舟', account: 'zhouzhou', avatar: '周', avatarColor: '#7E9D8E', online: true, signature: '在路上，也在写点东西。' },
+  { id: 9, name: '许诺', account: 'xunuo', avatar: '许', avatarColor: '#A68AC0', online: false, signature: '把复杂的事情说简单一点。' },
 ])
 
 const conversations = ref<Conversation[]>([
@@ -226,6 +234,19 @@ const currentConversation = computed(() =>
   conversations.value.find(conversation => conversation.id === selectedConversationId.value),
 )
 
+const currentUserProfile = computed(() =>
+  getUserProfile(CURRENT_USER_ID) as UserProfile,
+)
+
+const peerProfile = computed(() => {
+  const conversation = currentConversation.value
+
+  if (!conversation || conversation.isGroup || typeof conversation.peerUserId !== 'number')
+    return undefined
+
+  return getUserProfile(conversation.peerUserId)
+})
+
 const friendUserIds = computed(() =>
   conversations.value
     .filter(conversation => !conversation.isGroup && typeof conversation.peerUserId === 'number')
@@ -298,6 +319,7 @@ const createUserProfile = (account: string): UserProfile => {
     avatar: getAvatarLabel(account, false),
     avatarColor: getAvatarColor(account),
     online: false,
+    signature: '这个人还没有留下签名。',
   }
 
   userProfiles.value.push(profile)
@@ -418,6 +440,29 @@ const handleAddFriend = (userId: number) => {
   ensureDirectConversation(profile, '已从群成员添加为好友，可以开始聊天了。')
 }
 
+const handleUpdateCurrentUser = (payload: { name: string, signature: string, avatarImageUrl?: string }) => {
+  const profile = getUserProfile(CURRENT_USER_ID)
+
+  if (!profile)
+    return
+
+  const nextName = payload.name.trim()
+  if (!nextName)
+    return
+
+  profile.name = nextName
+  profile.signature = payload.signature.trim()
+  profile.avatar = getAvatarLabel(nextName, false)
+  profile.avatarImageUrl = payload.avatarImageUrl
+
+  conversations.value.forEach((conversation) => {
+    conversation.messages.forEach((message) => {
+      if (message.senderId === CURRENT_USER_ID)
+        message.senderName = nextName
+    })
+  })
+}
+
 const handleInviteGroupMembers = (payload: { conversationId: number, memberIds: number[] }) => {
   const targetConversation = conversations.value.find(conversation =>
     conversation.id === payload.conversationId && conversation.isGroup,
@@ -445,7 +490,7 @@ const handleInviteGroupMembers = (payload: { conversationId: number, memberIds: 
   targetConversation.messages.push({
     id: Date.now(),
     senderId: CURRENT_USER_ID,
-    senderName: '我',
+    senderName: currentUserProfile.value.name,
     content: `邀请 ${invitedNames} 加入了群聊。`,
     time,
     isMine: true,
